@@ -20,11 +20,12 @@ class OpsOverviewResponse(BaseModel):
     pending_escalations: List[Dict[str, Any]]
     fraud_flags: List[Dict[str, Any]]
     recent_audit_logs: List[Dict[str, Any]]
+    recent_bookings: Optional[List[Dict[str, Any]]] = []
 
 # --- READ-ONLY OPS OVERVIEW ENDPOINT ---
 @router.get("/ops-overview", response_model=OpsOverviewResponse)
 def get_ops_overview():
-    """Read-only operational overview fetching waitlist, escalations, fraud flags, and audit trail."""
+    """Read-only operational overview fetching waitlist, escalations, fraud flags, audit trail, and master bookings."""
     try:
         with get_db_cursor(commit_on_success=False) as (cur, conn):
             # 1. Waitlist Candidates
@@ -115,11 +116,54 @@ def get_ops_overview():
                 } for r in audit_rows
             ]
 
+            # 5. Master Bookings & Holds Ledger
+            cur.execute("""
+                SELECT 
+                    b.id::text AS booking_id,
+                    b.flight_id::text,
+                    b.passenger_id,
+                    b.passenger_name,
+                    b.passenger_email,
+                    b.class_name,
+                    b.fare_code,
+                    b.fare_amount,
+                    b.status,
+                    b.idempotency_key,
+                    b.created_at,
+                    f.flight_number,
+                    f.origin,
+                    f.destination
+                FROM bookings b
+                LEFT JOIN flights f ON b.flight_id = f.id
+                ORDER BY b.created_at DESC
+                LIMIT 50;
+            """)
+            booking_rows = cur.fetchall()
+            bookings_list = [
+                {
+                    "booking_id": r["booking_id"],
+                    "flight_id": r["flight_id"],
+                    "passenger_id": r["passenger_id"],
+                    "passenger_name": r["passenger_name"],
+                    "passenger_email": r["passenger_email"],
+                    "class_name": r["class_name"],
+                    "fare_code": r["fare_code"],
+                    "fare_amount": float(r["fare_amount"]) if r.get("fare_amount") is not None else 0.0,
+                    "status": r["status"],
+                    "idempotency_key": r["idempotency_key"],
+                    "flight_number": r.get("flight_number") or "HKT-888",
+                    "origin": r.get("origin") or "JFK",
+                    "destination": r.get("destination") or "LHR",
+                    "created_at": r["created_at"].isoformat() if r.get("created_at") else None
+                } for r in booking_rows
+            ]
+
             return OpsOverviewResponse(
                 waitlist_candidates=waitlist_list,
                 pending_escalations=escalations_list,
                 fraud_flags=fraud_list,
-                recent_audit_logs=audit_list
+                recent_audit_logs=audit_list,
+                recent_bookings=bookings_list
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to retrieve ops overview: {str(e)}")

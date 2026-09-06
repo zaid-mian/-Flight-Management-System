@@ -1,31 +1,169 @@
 import { API, API_BASE_URL } from "./api.js";
 
-
 // GLOBAL STATE
 let activeHold = null;
+let confirmedBooking = null;
 let holdTimerInterval = null;
 let currentView = "search";
+let selectedSeatNumber = "1A";
 
 // INITIALIZATION
 window.addEventListener("DOMContentLoaded", () => {
-  console.log("Flight Management System Frontend Initialized.");
+  console.log("SkyFlow Ops — Flight Control System Initialized.");
+
+  // Register baseline history state for landing page
+  if (typeof history !== "undefined" && history.replaceState) {
+    history.replaceState({ page: "landing" }, "", window.location.pathname);
+  }
+
+  // Guarantee full-screen landing page is visible on every page refresh
+  openLandingPage();
+
   checkHealth();
-  loadOpsOverview(); // Preload admin ops
+  loadOpsOverview();
+  loadRecentSearches();
+
+  const switchBtn = document.getElementById("btn-switch-workspace");
+  if (switchBtn) {
+    switchBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      window.togglePortalModal(true);
+    });
+  }
 });
+
+// HTML5 BROWSER BACK/FORWARD POPSTATE NAVIGATION HANDLER
+window.addEventListener("popstate", (e) => {
+  const state = e.state;
+  const hash = window.location.hash;
+
+  // Always close any active overlay modal on browser back/forward navigation
+  const archModal = document.getElementById("arch-modal-container");
+  if (archModal) {
+    archModal.classList.remove("active");
+    archModal.style.display = "none";
+  }
+
+  if (!state || state.page === "landing" || !hash || hash === "" || hash === "#landing") {
+    openLandingPage();
+  } else if (state.page === "workspace" || hash === "#passenger" || hash === "#admin") {
+    const role = (state && state.role) || (hash === "#passenger" ? "passenger" : "admin");
+    const landing = document.getElementById("landing-page-container");
+    if (landing) landing.style.setProperty("display", "none", "important");
+    switchTab(role);
+  } else if (state.page === "architecture" || hash === "#architecture") {
+    const landing = document.getElementById("landing-page-container");
+    if (landing) landing.style.setProperty("display", "none", "important");
+    toggleArchModal(true);
+  } else {
+    openLandingPage();
+  }
+});
+
+// BUTTON LOADING UTILITY
+function setButtonLoading(button, isLoading, loadingText = "Processing...") {
+  if (!button) return;
+  if (isLoading) {
+    button.dataset.originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.classList.add("disabled");
+    button.innerHTML = `<div class="spinner"></div> <span>${loadingText}</span>`;
+  } else {
+    button.disabled = false;
+    button.classList.remove("disabled");
+    if (button.dataset.originalHtml) {
+      button.innerHTML = button.dataset.originalHtml;
+    }
+  }
+}
+
+// ARCHITECTURE INSPECTOR MODAL TOGGLE & ORIGIN TRACKING
+let archModalOpenedFrom = null;
+
+window.toggleArchModal = function (show) {
+  const modal = document.getElementById("arch-modal-container");
+  if (modal) {
+    if (show) {
+      modal.classList.add("active");
+      modal.style.display = "flex";
+    } else {
+      modal.classList.remove("active");
+      modal.style.display = "none";
+      if (archModalOpenedFrom === "landing") {
+        archModalOpenedFrom = null;
+        openLandingPage();
+      }
+    }
+  }
+};
+
+// LANDING PAGE & WORKSPACE SELECTOR HANDLERS
+window.selectWorkspace = function (workspaceName) {
+  if (typeof history !== "undefined" && history.pushState && window.location.hash !== `#${workspaceName}`) {
+    history.pushState({ page: "workspace", role: workspaceName }, "", `#${workspaceName}`);
+  }
+  const landing = document.getElementById("landing-page-container");
+  if (landing) {
+    landing.style.setProperty("display", "none", "important");
+  }
+  if (workspaceName === "passenger") {
+    switchTab("passenger");
+  } else {
+    switchTab("admin");
+  }
+};
+
+window.openLandingPage = function () {
+  const landing = document.getElementById("landing-page-container");
+  if (landing) {
+    landing.style.setProperty("display", "flex", "important");
+  }
+  if (window.location.hash && typeof history !== "undefined" && history.pushState) {
+    history.pushState({ page: "landing" }, "", window.location.pathname);
+  }
+};
+
+window.togglePortalModal = function (show) {
+  if (show) {
+    window.openLandingPage();
+  } else {
+    const landing = document.getElementById("landing-page-container");
+    if (landing) {
+      landing.style.setProperty("display", "none", "important");
+    }
+  }
+};
+
+window.openArchitectureFromLanding = function () {
+  archModalOpenedFrom = "landing";
+  if (typeof history !== "undefined" && history.pushState && window.location.hash !== "#architecture") {
+    history.pushState({ page: "architecture" }, "", "#architecture");
+  }
+  const landing = document.getElementById("landing-page-container");
+  if (landing) {
+    landing.style.setProperty("display", "none", "important");
+  }
+  toggleArchModal(true);
+};
+
+window.selectPortal = function (portalName) {
+  window.selectWorkspace(portalName);
+};
 
 // UNIFIED VIEW SWITCHER
 window.switchView = function (viewName) {
   currentView = viewName;
+  togglePortalModal(false);
 
-  // View Titles Map
   const titles = {
-    search: { title: "Flight Search & Inventory Query", desc: "Query live flight availability from Supabase PostgreSQL and execute atomic seat holds." },
+    search: { title: "Flight Search & Live Inventory", desc: "Query live flight schedules from Supabase PostgreSQL and manage atomic seat holds." },
     bookings: { title: "Booking Lookup & Management", desc: "View detailed booking status, passenger info, fare codes, and cancel confirmed bookings." },
-    dashboard: { title: "Admin Operations Dashboard", desc: "System status metrics, waitlist overview, and pending HITL approval queue." },
+    dashboard: { title: "Admin Operations Control Center", desc: "System status metrics, waitlist overview, and pending HITL supervisor queue." },
+    "sub-bookings": { title: "Master Bookings & Holds Ledger", desc: "Authoritative transactional record of all confirmed, held, and cancelled flight reservations." },
     flights: { title: "Admin Flight Creator", desc: "Create new flight schedules and allocate seat class capacities directly on Supabase." },
     hitl: { title: "Refund Queue & HITL Approvals", desc: "Review high-value refund requests exceeding $500 threshold with server-side HMAC verification." },
     fraud: { title: "Fraud Risk Assessor", desc: "Real-time automated evaluation of database signals and booking anomalies." },
-    rag: { title: "RAG Vector Policy Workbench", desc: "Query Pinecone vector database (`flight-policies`) with SentenceTransformers embeddings." },
+    rag: { title: "RAG Vector Policy Workbench", desc: "Query Pinecone vector database ('flight-policies') with SentenceTransformers embeddings." },
     ops: { title: "Ops & Audit Ledger", desc: "View prioritized waitlist candidates and immutable system audit logs." }
   };
 
@@ -35,7 +173,7 @@ window.switchView = function (viewName) {
   }
 
   // Update Sidebar Nav State
-  const navIds = ["search", "bookings", "dashboard", "flights", "hitl", "fraud", "rag", "ops"];
+  const navIds = ["search", "bookings", "dashboard", "sub-bookings", "flights", "hitl", "fraud", "rag", "ops"];
   navIds.forEach((id) => {
     const navBtn = document.getElementById(`nav-${id}`);
     if (navBtn) {
@@ -47,61 +185,74 @@ window.switchView = function (viewName) {
     }
   });
 
-  // Toggle Top-level Tab Containers
+  // Toggle Top-level Tab Containers & Workspace Roles
   const pTab = document.getElementById("tab-passenger");
   const aTab = document.getElementById("tab-admin");
   const pView = document.getElementById("view-passenger");
   const aView = document.getElementById("view-admin");
 
+  const pNavGroup = document.getElementById("nav-group-passenger");
+  const aNavGroup = document.getElementById("nav-group-admin");
+  const eNavGroup = document.getElementById("nav-group-engineering");
+
+  const pRoleBtn = document.getElementById("role-btn-passenger");
+  const aRoleBtn = document.getElementById("role-btn-admin");
+
+  const brandSubtitle = document.getElementById("sidebar-brand-subtitle");
+  const badgeAvatar = document.getElementById("user-badge-avatar");
+  const badgeName = document.getElementById("user-badge-name");
+  const badgeRole = document.getElementById("user-badge-role");
+
   const isPassengerView = ["search", "bookings"].includes(viewName);
 
   if (isPassengerView) {
-    pTab.classList.add("active");
-    aTab.classList.remove("active");
+    if (pTab) pTab.classList.add("active");
+    if (aTab) aTab.classList.remove("active");
+    if (pRoleBtn) pRoleBtn.classList.add("active");
+    if (aRoleBtn) aRoleBtn.classList.remove("active");
+
+    if (pNavGroup) pNavGroup.style.display = "block";
+    if (aNavGroup) aNavGroup.style.display = "none";
+    if (eNavGroup) eNavGroup.style.display = "none";
+
+    if (brandSubtitle) brandSubtitle.textContent = "Customer Booking Portal";
+    if (badgeAvatar) badgeAvatar.textContent = "GP";
+    if (badgeName) badgeName.textContent = "Guest Passenger";
+    if (badgeRole) badgeRole.textContent = "Customer Self-Service";
+
     pView.style.display = "block";
     aView.style.display = "none";
 
-    // Ensure both cards are visible in passenger view for Playwright & scrolling
-    document.getElementById("subview-search").style.display = "block";
-    document.getElementById("subview-bookings").style.display = "block";
-
     if (viewName === "bookings") {
-      document.getElementById("subview-bookings").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("subview-search").style.display = "none";
+      document.getElementById("subview-bookings").style.display = "block";
     } else {
-      document.getElementById("subview-search").scrollIntoView({ behavior: "smooth" });
+      document.getElementById("subview-search").style.display = "block";
+      document.getElementById("subview-bookings").style.display = "none";
     }
   } else {
-    aTab.classList.add("active");
-    pTab.classList.remove("active");
+    if (aTab) aTab.classList.add("active");
+    if (pTab) pTab.classList.remove("active");
+    if (aRoleBtn) aRoleBtn.classList.add("active");
+    if (pRoleBtn) pRoleBtn.classList.remove("active");
+
+    if (pNavGroup) pNavGroup.style.display = "none";
+    if (aNavGroup) aNavGroup.style.display = "block";
+    if (eNavGroup) eNavGroup.style.display = "block";
+
+    if (brandSubtitle) brandSubtitle.textContent = "Airline Control Center";
+    if (badgeAvatar) badgeAvatar.textContent = "SA";
+    if (badgeName) badgeName.textContent = "Supervisor Admin";
+    if (badgeRole) badgeRole.textContent = "FastAPI Transactional Writer";
+
     aView.style.display = "block";
     pView.style.display = "none";
 
-    // Toggle Admin Subviews
-    const targetSub = viewName === "dashboard" ? "hitl" : viewName;
-    const subtabs = ["flights", "hitl", "fraud", "rag", "ops"];
-    
-    subtabs.forEach((st) => {
-      const btn = document.getElementById(`subtab-${st}`);
-      const view = document.getElementById(`admin-subview-${st}`);
-      
-      if (btn && view) {
-        if (st === targetSub) {
-          btn.classList.add("btn-primary");
-          btn.classList.remove("btn-secondary");
-          view.style.display = "block";
-        } else {
-          btn.classList.remove("btn-primary");
-          btn.classList.add("btn-secondary");
-          view.style.display = "none";
-        }
-      }
-    });
-
-    loadOpsOverview();
+    const targetSub = (viewName === "dashboard" || viewName === "sub-bookings") ? "bookings" : viewName;
+    switchSubTab(targetSub);
   }
 };
 
-// TAB SWITCHER COMPATIBILITY FOR TEST SUITE
 window.switchTab = function (tabName) {
   if (tabName === "passenger") {
     switchView("search");
@@ -110,11 +261,31 @@ window.switchTab = function (tabName) {
   }
 };
 
-window.switchSubTab = function (subtabName) {
-  switchView(subtabName);
+window.switchSubTab = function (subName) {
+  const subviews = ["bookings", "flights", "hitl", "fraud", "rag", "ops"];
+  subviews.forEach((sub) => {
+    const subContainer = document.getElementById(`admin-subview-${sub}`);
+    const subBtn = document.getElementById(`subtab-${sub}`);
+
+    if (subContainer) {
+      if (sub === subName) {
+        subContainer.style.display = "block";
+        if (subBtn) {
+          subBtn.classList.remove("btn-secondary");
+          subBtn.classList.add("btn-primary");
+        }
+      } else {
+        subContainer.style.display = "none";
+        if (subBtn) {
+          subBtn.classList.remove("btn-primary");
+          subBtn.classList.add("btn-secondary");
+        }
+      }
+    }
+  });
 };
 
-// HEALTH CHECK
+// HEALTH CHECK & SYSTEM STATUS
 async function checkHealth() {
   try {
     const data = await API.healthCheck();
@@ -134,153 +305,218 @@ async function checkHealth() {
 // TOAST NOTIFICATIONS
 window.showToast = function (message, type = "info") {
   const container = document.getElementById("toast-container");
+  if (!container) return;
+
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
-  
-  const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
-  toast.innerHTML = `<div>${icon}</div><div>${message}</div>`;
-  
+  toast.innerHTML = `<span>${message}</span>`;
+
   container.appendChild(toast);
+
   setTimeout(() => {
     toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
-  }, 4000);
+    toast.style.transform = "translateY(12px)";
+    setTimeout(() => toast.remove(), 250);
+  }, 4500);
 };
 
-// -------------------------------------------------------------------
-// PASSENGER PORTAL HANDLERS
-// -------------------------------------------------------------------
-
-// 1. FLIGHT SEARCH
+// FLIGHT INVENTORY SEARCH
 window.handleFlightSearch = async function () {
-  const origin = document.getElementById("search-origin").value.trim();
-  const destination = document.getElementById("search-destination").value.trim();
+  const origin = document.getElementById("search-origin").value.trim().toUpperCase();
+  const destination = document.getElementById("search-destination").value.trim().toUpperCase();
   const container = document.getElementById("search-results-container");
+  const searchBtn = document.getElementById("btn-search-flights");
 
-  container.innerHTML = `<p style="color: var(--text-muted); padding: 1rem 0;">Searching live Supabase inventory...</p>`;
+  setButtonLoading(searchBtn, true, "Querying...");
+  container.innerHTML = `<p style="color: #64748B;">Querying live flight inventory from Supabase PostgreSQL...</p>`;
 
   try {
     const flights = await API.searchFlights(origin, destination);
+    setButtonLoading(searchBtn, false);
 
     if (!flights || flights.length === 0) {
-      container.innerHTML = `<p style="color: var(--accent-amber); padding: 1rem 0;">No flights found matching '${origin}' to '${destination}'. Try clearing filters or create a flight in Admin tab.</p>`;
+      container.innerHTML = `
+        <div style="padding: 1.5rem; text-align: center; color: #64748B; background: #F8FAFC; border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
+          <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">✈️</div>
+          <div style="font-weight: 700; color: #334155;">No Active Flights Found</div>
+          <div style="font-size: 0.82rem; margin-top: 0.2rem;">Try searching for origin <strong>JFK</strong> and destination <strong>LHR</strong>.</div>
+        </div>`;
       return;
     }
 
-    let html = `<div class="flights-grid">`;
-    flights.forEach((f) => {
-      const dep = new Date(f.departure_time).toLocaleString();
-      const arr = new Date(f.arrival_time).toLocaleString();
-      
+    let html = "";
+    flights.forEach((flight) => {
       html += `
-        <div class="flight-card">
-          <div class="flight-card-header">
-            <div class="flight-route">
-              <span class="flight-num">${f.flight_number}</span>
-              <span class="route-airports">${f.origin} <span class="arrow">➔</span> ${f.destination}</span>
+        <div class="card" style="border: 1px solid var(--border-color); padding: 1.25rem; margin-bottom: 1rem; background: #FFFFFF; box-shadow: var(--shadow-xs);">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <div style="font-size: 1.2rem; font-weight: 800; color: var(--primary);" class="font-mono">${flight.flight_number}</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-top: 0.2rem;">
+                ${flight.origin} ➔ ${flight.destination}
+              </div>
             </div>
-            <span class="badge badge-active">${f.status}</span>
-          </div>
-
-          <div class="flight-meta-grid">
-            <div class="meta-item">
-              <span class="meta-label">DEPARTURE</span>
-              <span class="meta-value">🛫 ${dep}</span>
-            </div>
-            <div class="meta-item">
-              <span class="meta-label">ARRIVAL</span>
-              <span class="meta-value">🛬 ${arr}</span>
-            </div>
-            <div class="meta-item">
-              <span class="meta-label">TOTAL CAPACITY</span>
-              <span class="meta-value">📊 ${f.total_capacity} seats</span>
+            <div style="text-align: right;">
+              <span class="table-pill table-pill-success">${flight.status}</span>
+              <div style="font-size: 0.78rem; color: #64748B; margin-top: 0.3rem;">Total Aircraft Capacity: <strong class="tabular-nums">${flight.total_capacity} seats</strong></div>
             </div>
           </div>
 
-          <div class="seat-classes-grid">
+          <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+            <div style="font-size: 0.78rem; font-weight: 700; text-transform: uppercase; color: #64748B; margin-bottom: 0.75rem; letter-spacing: 0.5px;">
+              Available Seat Inventory & Pricing
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.85rem;">
       `;
 
-      f.seat_classes.forEach((sc) => {
-        const isAvail = sc.available_seats > 0;
-        const badgeClass = !isAvail ? "badge-soldout" : (sc.available_seats <= 2 ? "badge-pending" : "badge-confirmed");
-        const badgeText = !isAvail ? "SOLD OUT" : (sc.available_seats <= 2 ? "LIMITED" : "AVAILABLE");
-
+      flight.seat_classes.forEach((sc) => {
+        const isAvailable = sc.available_seats > 0;
         html += `
-          <div class="seat-class-card">
-            <div class="class-header">
-              <span class="class-name">${sc.class_name}</span>
-              <span class="class-price">$${sc.fare_base_price.toFixed(2)}</span>
+          <div style="background: ${isAvailable ? "#F8FAFC" : "#FEF2F2"}; border: 1px solid ${isAvailable ? "var(--border-color)" : "#FECACA"}; padding: 0.85rem 1rem; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main);">${sc.class_name} CLASS</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary);" class="font-mono tabular-nums">$${sc.fare_base_price}</div>
+              <div style="font-size: 0.78rem; color: ${isAvailable ? "#059669" : "#DC2626"}; font-weight: 600; margin-top: 0.2rem;">
+                ${sc.available_seats} / ${sc.total_seats} seats available
+              </div>
             </div>
-            <div class="class-availability">
-              <span class="badge ${badgeClass}">${badgeText}</span>
-              <span class="seats-count">${sc.available_seats} / ${sc.total_seats} seats left</span>
+            <div>
+              ${
+                isAvailable
+                  ? `<button class="btn btn-primary" style="font-size: 0.8rem; padding: 0.45rem 0.85rem;" onclick="initiateSeatHold('${flight.id}', '${flight.flight_number}', '${flight.origin}', '${flight.destination}', '${sc.class_name}', ${sc.fare_base_price}, ${sc.available_seats}, ${sc.total_seats})">
+                      Select Seat & Hold
+                    </button>`
+                  : `<button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.45rem 0.85rem;" disabled>Sold Out</button>`
+              }
             </div>
-            <button class="btn btn-primary" style="width: 100%; font-size: 0.85rem;" 
-                    ${!isAvail ? 'disabled' : ''} 
-                    onclick="handleHoldSeat('${f.id}', '${sc.class_name}', ${sc.fare_base_price}, this)">
-              ${isAvail ? 'Hold Seat (10m TTL)' : 'Sold Out'}
-            </button>
           </div>
         `;
       });
 
-      html += `</div></div>`;
+      html += `
+            </div>
+          </div>
+        </div>
+      `;
     });
 
-    html += `</div>`;
     container.innerHTML = html;
   } catch (err) {
-    container.innerHTML = `<p style="color: var(--accent-rose);">Error searching flights: ${err.message}</p>`;
-    showToast(err.message, "error");
+    setButtonLoading(searchBtn, false);
+    showToast(`Flight search failed: ${err.message}`, "error");
+    container.innerHTML = `<p style="color: #DC2626;">Error searching flights: ${err.message}</p>`;
   }
 };
 
-// 2. CREATE SEAT HOLD
-window.handleHoldSeat = async function (flightId, className, basePrice, btnElement) {
-  if (btnElement) {
-    btnElement.disabled = true;
+// INTERACTIVE CABIN SEAT SELECTOR GENERATOR
+function renderCabinSeatGrid(flightId, className, availableSeats, totalSeats) {
+  const container = document.getElementById("cabin-seat-grid");
+  const titleElem = document.getElementById("seat-map-class-title");
+
+  if (titleElem) {
+    titleElem.textContent = `${className.toUpperCase()} CABIN SEAT MAP (${availableSeats} SEATS AVAILABLE)`;
   }
 
+  if (!container) return;
+
+  const seatsPerRow = className.toUpperCase() === "BUSINESS" ? 4 : 6;
+  const letters = ["A", "B", "C", "D", "E", "F"];
+  const numRows = Math.max(2, Math.ceil(totalSeats / seatsPerRow));
+
+  let html = "";
+  let seatCounter = 0;
+
+  for (let r = 1; r <= numRows; r++) {
+    html += `<div class="seat-row"><div class="row-label">${r}</div>`;
+
+    for (let c = 0; c < seatsPerRow; c++) {
+      if (c === Math.floor(seatsPerRow / 2)) {
+        html += `<div class="aisle-gap"></div>`;
+      }
+
+      seatCounter++;
+      const seatCode = `${r}${letters[c]}`;
+      const isBooked = seatCounter > availableSeats + Math.floor(totalSeats * 0.2);
+      const isHeld = !isBooked && seatCounter > availableSeats;
+      const isAvailable = !isBooked && !isHeld;
+      const isSelected = seatCode === selectedSeatNumber;
+
+      let seatClass = "seat-cell";
+      if (isSelected) seatClass += " selected";
+      else if (isBooked) seatClass += " booked";
+      else if (isHeld) seatClass += " held";
+      else seatClass += " available";
+
+      html += `
+        <div class="${seatClass}" 
+             onclick="${isAvailable ? `selectCabinSeat('${seatCode}')` : ''}" 
+             title="Seat ${seatCode} (${isAvailable ? 'Available' : isHeld ? 'Active Hold' : 'Booked'})">
+          ${seatCode}
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+window.selectCabinSeat = function (seatCode) {
+  selectedSeatNumber = seatCode;
+  showToast(`Selected Seat ${seatCode}`, "info");
+  if (activeHold) {
+    renderCabinSeatGrid(activeHold.flight_id, activeHold.class_name, 5, 12);
+  }
+};
+
+// INITIATE SEAT HOLD & OPEN RIGHT-SIDE DRAWER (540px DESKTOP)
+window.initiateSeatHold = async function (flightId, flightNumber, origin, destination, className, farePrice, availableSeats, totalSeats) {
   try {
     const payload = {
       flight_id: flightId,
       class_name: className,
-      passenger_id: "pass_demo_01",
+      passenger_id: "pass_demo_" + Math.floor(Math.random() * 1000),
       seat_count: 1,
       hold_duration_minutes: 10
     };
 
-    const res = await API.createSeatHold(payload);
+    const holdData = await API.createSeatHold(payload);
     activeHold = {
-      hold_id: res.hold_id,
-      flight_id: res.flight_id,
-      class_name: res.class_name,
-      expires_at: new Date(res.expires_at),
-      fare_base_price: basePrice
+      ...holdData,
+      flight_number: flightNumber || "HKT-888",
+      origin: origin || "JFK",
+      destination: destination || "LHR",
+      fare_price: farePrice || 250.00
     };
 
-window.closeHoldModal = function () {
-  const holdBox = document.getElementById("active-hold-container");
-  if (holdBox) {
-    holdBox.style.display = "none";
-  }
-};
+    showToast(`Temporary seat hold active for 10 minutes (Hold ID: ${holdData.hold_id.substring(0, 8)}...)`, "success");
 
-    showToast(`Seat hold created! Hold ID: ${res.hold_id}`, "success");
+    // Populate Right-Side Drawer Header & Summaries
+    document.getElementById("drawer-flight-code").textContent = activeHold.flight_number;
+    document.getElementById("drawer-flight-route").textContent = `${activeHold.origin} ➔ ${activeHold.destination}`;
+    document.getElementById("drawer-flight-class").textContent = className.toUpperCase();
+    document.getElementById("drawer-flight-price").textContent = `$${activeHold.fare_price.toFixed(2)}`;
+    document.getElementById("drawer-total-price").textContent = `$${activeHold.fare_price.toFixed(2)}`;
+    document.getElementById("hold-id-display").textContent = `Hold ID: ${holdData.hold_id}`;
+    document.getElementById("book-idempotency-key").value = `idemp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    // Render 2D Aircraft Cabin Map inside Drawer Body
+    renderCabinSeatGrid(flightId, className, availableSeats, totalSeats);
 
-    // Display Active Hold Box & Start Timer
-    const holdBox = document.getElementById("active-hold-container");
-    document.getElementById("hold-id-display").textContent = `Hold ID: ${res.hold_id} | Class: ${res.class_name}`;
-    document.getElementById("book-idempotency-key").value = `book-key-${crypto.randomUUID()}`;
-    holdBox.style.display = "flex";
+    // Reset panel view states to checkout view
+    const checkoutView = document.getElementById("hold-panel-checkout-view");
+    const confirmView = document.getElementById("hold-panel-confirmation-view");
+    if (checkoutView) checkoutView.style.display = "flex";
+    if (confirmView) confirmView.style.display = "none";
 
-    startHoldTimer(activeHold.expires_at);
-    handleFlightSearch(); // Refresh search results to show decremented inventory
+    // Open Centered Focused Hold Panel
+    const holdPanel = document.getElementById("active-hold-panel");
+    if (holdPanel) holdPanel.classList.add("active");
+
+    // Start 10-minute Countdown Timer
+    startHoldTimer(new Date(holdData.expires_at));
   } catch (err) {
-    if (btnElement) {
-      btnElement.disabled = false;
-    }
-    showToast(`Hold creation failed: ${err.message}`, "error");
+    showToast(`Seat hold failed: ${err.message}`, "error");
   }
 };
 
@@ -288,557 +524,678 @@ window.closeHoldModal = function () {
 function startHoldTimer(expiresAt) {
   if (holdTimerInterval) clearInterval(holdTimerInterval);
 
-  function updateDisplay() {
+  function updateTimer() {
     const now = new Date();
     const diffMs = expiresAt - now;
 
     if (diffMs <= 0) {
       clearInterval(holdTimerInterval);
-      document.getElementById("hold-timer-countdown").textContent = "EXPIRED";
-      document.getElementById("hold-timer-countdown").style.color = "var(--accent-rose)";
-      showToast("Seat hold has expired! Create a new hold to book.", "error");
+      document.getElementById("hold-timer-countdown").textContent = "00:00 EXPIRED";
+      showToast("Seat hold has expired.", "warning");
+      activeHold = null;
       return;
     }
 
-    const mins = Math.floor(diffMs / 60000);
-    const secs = Math.floor((diffMs % 60000) / 1000);
-    document.getElementById("hold-timer-countdown").textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const totalSecs = Math.floor(diffMs / 1000);
+    const mins = Math.floor(totalSecs / 60);
+    const secs = totalSecs % 60;
+    const formatted = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    
+    const elem = document.getElementById("hold-timer-countdown");
+    if (elem) elem.textContent = formatted;
   }
 
-  updateDisplay();
-  holdTimerInterval = setInterval(updateDisplay, 1000);
+  updateTimer();
+  holdTimerInterval = setInterval(updateTimer, 1000);
 }
 
-// 3. COMPLETE BOOKING
+window.closeHoldModal = function () {
+  const holdPanel = document.getElementById("active-hold-panel");
+  if (holdPanel) {
+    holdPanel.classList.remove("active");
+    holdPanel.style.display = "none";
+  }
+};
+
+// POST-BOOKING RECEIPT HELPER ACTIONS
+window.copyCurrentBookingId = function () {
+  const bId = confirmedBooking ? confirmedBooking.booking_id : document.getElementById("confirm-booking-id").textContent;
+  if (bId && bId !== "-") {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(bId).catch(() => {});
+      }
+    } catch (e) {}
+    showToast("Booking Reference ID copied to clipboard!", "info");
+  }
+};
+
+window.viewCurrentBookingInLookup = function () {
+  const bId = confirmedBooking ? confirmedBooking.booking_id : document.getElementById("confirm-booking-id").textContent;
+  closeHoldModal();
+  switchView("bookings");
+  if (bId && bId !== "-") {
+    fillSamplePNR(bId);
+  }
+};
+
+// ATOMIC BOOKING COMPLETION
 window.handleCompleteBooking = async function () {
   if (!activeHold) {
-    showToast("No active seat hold found. Please hold a seat first.", "error");
+    showToast("No active seat hold found. Please hold a seat first.", "warning");
     return;
   }
 
-  const btn = document.getElementById("btn-complete-booking");
-  if (btn) {
-    btn.disabled = true;
-  }
+  const completeBtn = document.getElementById("btn-complete-booking");
+  setButtonLoading(completeBtn, true, "Confirming Booking...");
 
-  const passengerId = document.getElementById("book-passenger-id").value.trim();
-  const passengerName = document.getElementById("book-passenger-name").value.trim();
-  const passengerEmail = document.getElementById("book-passenger-email").value.trim();
-  const idempotencyKey = document.getElementById("book-idempotency-key").value.trim();
+  const payload = {
+    flight_id: activeHold.flight_id,
+    passenger_id: document.getElementById("book-passenger-id").value.trim(),
+    passenger_name: document.getElementById("book-passenger-name").value.trim(),
+    passenger_email: document.getElementById("book-passenger-email").value.trim(),
+    class_name: activeHold.class_name,
+    fare_code: activeHold.class_name.toUpperCase() === "BUSINESS" ? "BUSINESS_FLEX" : "BASIC_ECONOMY",
+    fare_amount: activeHold.fare_price || (activeHold.class_name.toUpperCase() === "BUSINESS" ? 850.00 : 250.00),
+    hold_id: activeHold.hold_id,
+    idempotency_key: document.getElementById("book-idempotency-key").value.trim()
+  };
 
   try {
-    const payload = {
-      flight_id: activeHold.flight_id,
-      class_name: activeHold.class_name,
-      passenger_id: passengerId,
-      passenger_name: passengerName,
-      passenger_email: passengerEmail,
-      fare_code: activeHold.class_name === "BUSINESS" ? "BUSINESS_FLEX" : "BASIC_ECONOMY",
-      fare_amount: activeHold.fare_base_price,
-      hold_id: activeHold.hold_id,
-      idempotency_key: idempotencyKey
+    const booking = await API.createBooking(payload);
+    setButtonLoading(completeBtn, false);
+
+    // Store confirmed booking state
+    confirmedBooking = {
+      ...booking,
+      flight_number: activeHold.flight_number || "HKT-888",
+      origin: activeHold.origin || "JFK",
+      destination: activeHold.destination || "LHR",
+      seat_number: selectedSeatNumber || "1A",
+      class_name: activeHold.class_name
     };
 
-    const bookingRes = await API.createBooking(payload);
-    showToast(`Booking Confirmed! ID: ${bookingRes.booking_id}`, "success");
+    // Save enriched booking details to LocalStorage under RECENT_BOOKINGS
+    saveRecentBooking({
+      booking_id: booking.booking_id,
+      flight_number: activeHold.flight_number || "HKT-888",
+      origin: activeHold.origin || "JFK",
+      destination: activeHold.destination || "LHR",
+      passenger_name: payload.passenger_name,
+      class_name: activeHold.class_name,
+      seat_number: selectedSeatNumber || "1A",
+      fare_amount: payload.fare_amount,
+      created_at: booking.created_at || new Date().toISOString()
+    });
 
-    if (btn) {
-      btn.disabled = false;
-    }
-
-    // Clear active hold state
     if (holdTimerInterval) clearInterval(holdTimerInterval);
-    document.getElementById("active-hold-container").style.display = "none";
+
+    // Populate Post-Booking Confirmation Receipt UI
+    document.getElementById("confirm-booking-id").textContent = booking.booking_id;
+    document.getElementById("confirm-flight-route").textContent = `${confirmedBooking.flight_number} (${confirmedBooking.origin} ➔ ${confirmedBooking.destination})`;
+    document.getElementById("confirm-seat-details").textContent = `${confirmedBooking.class_name.toUpperCase()} (${confirmedBooking.seat_number})`;
+    document.getElementById("confirm-passenger-name").textContent = payload.passenger_name;
+    document.getElementById("confirm-passenger-email").textContent = payload.passenger_email;
+    document.getElementById("confirm-fare-amount").textContent = `$${payload.fare_amount.toFixed(2)}`;
+    document.getElementById("confirm-booking-status").textContent = booking.status || "CONFIRMED";
+
+    // Transition modal state to Confirmation Receipt view
+    const checkoutView = document.getElementById("hold-panel-checkout-view");
+    const confirmView = document.getElementById("hold-panel-confirmation-view");
+    if (checkoutView) checkoutView.style.display = "none";
+    if (confirmView) confirmView.style.display = "flex";
+
+    showToast(`Booking Confirmed! (Booking ID: ${booking.booking_id.substring(0, 8)}...)`, "success");
+
     activeHold = null;
 
-    // Load booking details in lookup card
-    document.getElementById("lookup-booking-id").value = bookingRes.booking_id;
-    handleBookingLookup();
-    handleFlightSearch(); // Refresh search
+    // Refresh flight search & ops dashboard
+    handleFlightSearch();
+    loadOpsOverview();
   } catch (err) {
-    if (btn) {
-      btn.disabled = false;
-    }
+    setButtonLoading(completeBtn, false);
     showToast(`Booking failed: ${err.message}`, "error");
   }
 };
 
-// 4. BOOKING LOOKUP
-window.handleBookingLookup = async function () {
-  const bookingId = document.getElementById("lookup-booking-id").value.trim();
-  const container = document.getElementById("booking-lookup-result");
-  const btn = document.getElementById("btn-lookup-booking");
+// ENRICHED RECENT BOOKINGS SHORTCUTS
+function saveRecentBooking(bookingObj) {
+  if (!bookingObj || typeof localStorage === "undefined") return;
+  try {
+    let recent = JSON.parse(localStorage.getItem("RECENT_BOOKINGS") || "[]");
+    let obj = typeof bookingObj === "string" ? { booking_id: bookingObj } : bookingObj;
+    if (!obj || !obj.booking_id) return;
+    recent = recent.filter((b) => b && b.booking_id !== obj.booking_id);
+    recent.unshift(obj);
+    recent = recent.slice(0, 4);
+    localStorage.setItem("RECENT_BOOKINGS", JSON.stringify(recent));
+    loadRecentSearches();
+  } catch (e) {}
+}
 
-  if (!bookingId) {
-    showToast("Please enter a Booking ID or Idempotency Key", "error");
+function saveRecentSearch(queryOrObj) {
+  saveRecentBooking(queryOrObj);
+}
+window.saveRecentSearch = saveRecentSearch;
+
+function loadRecentSearches() {
+  const container = document.getElementById("recent-lookups-bar");
+  if (!container || typeof localStorage === "undefined") return;
+
+  try {
+    const recentBookings = JSON.parse(localStorage.getItem("RECENT_BOOKINGS") || "[]");
+    let html = `
+      <button class="shortcut-pill" onclick="fillSamplePNR('demo_sample_1')"><span>🔗 Sample PNR #1</span></button>
+      <button class="shortcut-pill" onclick="fillSamplePNR('demo_sample_2')"><span>🔗 Sample PNR #2</span></button>
+    `;
+
+    recentBookings.forEach((b) => {
+      const shortId = b.booking_id ? b.booking_id.substring(0, 8) : "PNR";
+      const name = b.passenger_name ? b.passenger_name.split(" ")[0] : "Passenger";
+      const flt = b.flight_number || "FLT";
+      html += `
+        <button class="shortcut-pill" onclick="fillSamplePNR('${b.booking_id}')">
+          <span>🎟️ ${flt} (${name} • ${shortId}...)</span>
+        </button>
+      `;
+    });
+
+    container.innerHTML = html;
+  } catch (e) {}
+}
+
+window.fillSamplePNR = function (val) {
+  const input = document.getElementById("lookup-booking-id");
+  if (!input) return;
+
+  if (val === "demo_sample_1") {
+    input.value = "b001a000-0000-0000-0000-000000000001";
+  } else if (val === "demo_sample_2") {
+    input.value = "b002a000-0000-0000-0000-000000000002";
+  } else {
+    input.value = val;
+  }
+
+  handleBookingLookup();
+};
+
+window.handleBookingLookup = async function () {
+  const query = document.getElementById("lookup-booking-id").value.trim();
+  const resultContainer = document.getElementById("booking-lookup-result");
+  const lookupBtn = document.getElementById("btn-lookup-booking");
+
+  if (!query) {
+    showToast("Please enter a Booking ID or Idempotency Key", "warning");
     return;
   }
 
-  if (btn) {
-    btn.disabled = true;
-  }
-
-  container.style.display = "block";
-  container.innerHTML = `<p style="color: var(--text-muted);">Fetching authoritative booking context from Supabase...</p>`;
+  setButtonLoading(lookupBtn, true, "Searching...");
+  resultContainer.style.display = "block";
+  resultContainer.innerHTML = `<p style="color: #64748B;">Searching booking records...</p>`;
 
   try {
-    const ctx = await API.getBookingContext(bookingId);
-    if (btn) {
-      btn.disabled = false;
+    const ctx = await API.getBookingContext(query);
+    setButtonLoading(lookupBtn, false);
+
+    if (!ctx || !ctx.booking) {
+      resultContainer.innerHTML = `<p style="color: #DC2626;">Booking record not found for query '${query}'.</p>`;
+      return;
     }
+
+    saveRecentSearch(query);
 
     const b = ctx.booking;
-    const f = ctx.flight;
+    const isCancelled = b.status === "CANCELLED" || b.status === "REFUNDED";
 
-    const isConfirmed = b.status === "CONFIRMED";
-    const statusBadgeBg = isConfirmed ? "#DEF7EC" : "#FDE8E8";
-    const statusBadgeColor = isConfirmed ? "#03543F" : "#9B1C1C";
-    const statusBadgeBorder = isConfirmed ? "#BCF0DA" : "#FBD5D5";
-    const statusDotColor = isConfirmed ? "#10B981" : "#EF4444";
-
-    let html = `
-      <div class="booking-detail-card" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.02); margin-top: 1rem;">
-        
-        <!-- HEADER ROW -->
-        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid #E2E8F0; flex-wrap: wrap; gap: 0.75rem;">
+    resultContainer.innerHTML = `
+      <div class="card" style="border: 1px solid var(--border-color); background: #FFFFFF; padding: 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
           <div>
-            <div style="font-size: 1.2rem; font-weight: 800; color: #0F172A; display: flex; align-items: center; gap: 0.5rem;">
-              <span>🎫 Booking</span>
-              <span style="font-family: 'JetBrains Mono', monospace; color: #0052FF; font-size: 1.05rem;">#${b.id}</span>
-            </div>
-            <div style="font-size: 0.85rem; color: #64748B; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.4rem;">
-              <span>📅 Created: ${new Date(b.created_at).toLocaleString()}</span>
-            </div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary);" class="font-mono">${b.booking_id}</div>
+            <div style="font-size: 0.85rem; color: #64748B;">Passenger: <strong>${b.passenger_name}</strong> (${b.passenger_email})</div>
           </div>
-          <div style="background: ${statusBadgeBg}; color: ${statusBadgeColor}; border: 1px solid ${statusBadgeBorder}; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.85rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.4rem; text-transform: uppercase; letter-spacing: 0.03em;">
-            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusDotColor}; display: inline-block;"></span>
-            ${b.status}
+          <div>
+            <span class="table-pill ${isCancelled ? "table-pill-danger" : "table-pill-success"}">${b.status}</span>
           </div>
         </div>
 
-        <!-- 3-COLUMN DETAILS GRID -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-          
-          <!-- PASSENGER PANEL -->
-          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 1rem;">
-            <div style="font-size: 0.725rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
-              <span>👤</span> PASSENGER
-            </div>
-            <div style="font-weight: 700; font-size: 0.95rem; color: #0F172A; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
-              <span>${b.passenger_name}</span>
-              <span style="background: #E2E8F0; color: #334155; font-size: 0.725rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${b.passenger_id}</span>
-            </div>
-            <div style="font-size: 0.825rem; color: #64748B; margin-top: 0.3rem;">✉️ ${b.passenger_email}</div>
-          </div>
-
-          <!-- FLIGHT DETAILS PANEL -->
-          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 1rem;">
-            <div style="font-size: 0.725rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
-              <span>✈️</span> FLIGHT DETAILS
-            </div>
-            <div style="font-weight: 700; font-size: 0.95rem; color: #0F172A;">
-              ${f.flight_number} <span style="color: #0052FF;">(${f.origin} ➔ ${f.destination})</span>
-            </div>
-            <div style="font-size: 0.825rem; color: #64748B; margin-top: 0.3rem;">🕒 ${new Date(f.departure_time).toLocaleString()}</div>
-          </div>
-
-          <!-- FARE & CLASS PANEL -->
-          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 1rem;">
-            <div style="font-size: 0.725rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
-              <span>💳</span> FARE & CLASS
-            </div>
-            <div style="font-weight: 700; font-size: 0.925rem; color: #0F172A;">${b.class_name} · <span style="color: #64748B; font-weight: 500;">${b.fare_code}</span></div>
-            <div style="font-weight: 800; color: #059669; font-size: 1.15rem; margin-top: 0.2rem;">$${b.fare_amount.toFixed(2)} USD</div>
-          </div>
-
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.25rem; background: #F8FAFC; padding: 1rem; border-radius: var(--radius-md);">
+          <div><div style="font-size: 0.72rem; color: #64748B; text-transform: uppercase;">Flight</div><div style="font-weight: 700;" class="font-mono">${b.flight_number || "HKT-888"}</div></div>
+          <div><div style="font-size: 0.72rem; color: #64748B; text-transform: uppercase;">Seat Class</div><div style="font-weight: 700;">${b.class_name}</div></div>
+          <div><div style="font-size: 0.72rem; color: #64748B; text-transform: uppercase;">Fare Amount</div><div style="font-weight: 800; color: var(--primary);" class="font-mono tabular-nums">$${b.fare_amount}</div></div>
+          <div><div style="font-size: 0.72rem; color: #64748B; text-transform: uppercase;">Idempotency Key</div><div style="font-size: 0.75rem;" class="font-mono">${b.idempotency_key}</div></div>
         </div>
+
+        ${
+          !isCancelled
+            ? `<button class="btn btn-danger" onclick="handleCancelBooking('${b.booking_id}')">
+                <span>Cancel Booking & Process Refund</span>
+               </button>`
+            : `<div style="font-size: 0.82rem; color: #DC2626; font-weight: 600;">This booking is already cancelled/refunded.</div>`
+        }
+      </div>
     `;
-
-    if (b.status === "CONFIRMED") {
-      html += `
-        <!-- ACTION BUTTONS -->
-        <div style="display: flex; gap: 0.85rem; align-items: center; border-top: 1px solid #E2E8F0; padding-top: 1.25rem; flex-wrap: wrap;">
-          <button class="btn btn-danger" style="background: #DC2626; color: #FFFFFF; font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.15s ease;" 
-                  onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'"
-                  onclick="handleCancelBooking('${b.id}')">
-            🚫 Cancel Booking & Restore Inventory
-          </button>
-          <button class="btn btn-warning" style="background: #D97706; color: #FFFFFF; font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.15s ease;"
-                  onmouseover="this.style.background='#B45309'" onmouseout="this.style.background='#D97706'"
-                  onclick="handleCalculateRefund('${b.id}')">
-            💰 Check Refund Entitlement
-          </button>
-        </div>
-      `;
-    }
-
-    // AUDIT HISTORY
-    if (ctx.audit_history && ctx.audit_history.length > 0) {
-      html += `
-        <div style="margin-top: 1.25rem; border-top: 1px solid #E2E8F0; padding-top: 1.25rem;">
-          <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.35rem;">
-            <span>📜</span> AUTHORITATIVE AUDIT HISTORY
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-      `;
-      ctx.audit_history.forEach(a => {
-        const actorIdStr = a.actor_id ? ` (${a.actor_id})` : '';
-        html += `
-          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 6px; padding: 0.65rem 0.85rem; font-size: 0.85rem; color: #334155; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span style="background: #EFF6FF; color: #1D4ED8; font-weight: 700; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-family: monospace;">${a.action}</span>
-              <span>by <strong style="color: #0F172A;">${a.actor_type}</strong>${actorIdStr}</span>
-            </div>
-            <div style="font-size: 0.775rem; color: #64748B;">🕒 ${new Date(a.created_at).toLocaleTimeString()}</div>
-          </div>
-        `;
-      });
-      html += `</div></div>`;
-    }
-
-    html += `</div>`;
-    container.innerHTML = html;
   } catch (err) {
-    if (btn) {
-      btn.disabled = false;
-    }
-    container.innerHTML = `<p style="color: var(--accent-rose);">Lookup error: ${err.message}</p>`;
+    setButtonLoading(lookupBtn, false);
+    showToast(`Booking lookup error: ${err.message}`, "error");
+    resultContainer.innerHTML = `<p style="color: #DC2626;">Error: ${err.message}</p>`;
   }
 };
 
-// 5. CANCELLATION
 window.handleCancelBooking = async function (bookingId) {
-  if (!confirm(`Are you sure you want to cancel booking ${bookingId}? Inventory will be restored.`)) return;
+  if (!confirm("Are you sure you want to cancel this booking?")) return;
 
   try {
-    const res = await API.cancelBooking(bookingId, "Passenger portal request");
-    showToast(`Booking Cancelled! Inventory Restored: ${res.inventory_restored}`, "success");
-    handleBookingLookup(); // Refresh details
-    handleFlightSearch(); // Refresh available inventory
+    const res = await API.cancelBooking(bookingId);
+    showToast(`Booking ${bookingId.substring(0, 8)}... Cancelled successfully!`, "success");
+    handleBookingLookup();
     loadOpsOverview();
   } catch (err) {
     showToast(`Cancellation failed: ${err.message}`, "error");
   }
 };
 
-// CHECK REFUND ENTITLEMENT
-window.handleCalculateRefund = async function (bookingId) {
-  try {
-    const res = await API.calculateRefund(bookingId);
-    alert(`DETERMINISTIC REFUND RESULT:\n\nEligible Refund: $${res.eligible_refund_amount.toFixed(2)}\nCancellation Fee: $${res.cancellation_fee.toFixed(2)}\nRule Applied: ${res.rule_applied}\nRequires Supervisor Approval: ${res.requires_human_approval}`);
-  } catch (err) {
-    showToast(`Refund calculation failed: ${err.message}`, "error");
-  }
-};
-
-// -------------------------------------------------------------------
-// ADMIN & OPERATIONS DASHBOARD HANDLERS
-// -------------------------------------------------------------------
-
-// 1. ADMIN CREATE FLIGHT
+// ADMIN FLIGHT CREATOR
 window.handleAdminCreateFlight = async function () {
   const flightNum = document.getElementById("admin-flight-num").value.trim();
-  const origin = document.getElementById("admin-origin").value.trim();
-  const destination = document.getElementById("admin-destination").value.trim();
-  const capacity = parseInt(document.getElementById("admin-capacity").value);
-  const econSeats = parseInt(document.getElementById("admin-economy-seats").value);
-  const busSeats = parseInt(document.getElementById("admin-business-seats").value);
-  const btn = document.getElementById("btn-create-flight");
+  const origin = document.getElementById("admin-origin").value.trim().toUpperCase();
+  const destination = document.getElementById("admin-destination").value.trim().toUpperCase();
+  const capacity = parseInt(document.getElementById("admin-capacity").value, 10);
+  const econSeats = parseInt(document.getElementById("admin-economy-seats").value, 10);
+  const busSeats = parseInt(document.getElementById("admin-business-seats").value, 10);
+  const createBtn = document.getElementById("btn-create-flight");
 
   if (econSeats + busSeats !== capacity) {
-    showToast(`Validation Error: Sum of seats (${econSeats + busSeats}) must equal Total Capacity (${capacity})`, "error");
+    showToast(`Validation Error: Economy (${econSeats}) + Business (${busSeats}) seats must equal total capacity (${capacity}).`, "warning");
     return;
   }
 
-  if (btn) {
-    btn.disabled = true;
-  }
-
-  const dep = new Date(Date.now() + 86400000 * 2).toISOString();
-  const arr = new Date(Date.now() + 86400000 * 2 + 3600000 * 8).toISOString();
+  setButtonLoading(createBtn, true, "Creating Flight...");
 
   const payload = {
     flight_number: flightNum,
     origin: origin,
     destination: destination,
-    departure_time: dep,
-    arrival_time: arr,
+    departure_time: new Date(Date.now() + 86400000).toISOString(),
+    arrival_time: new Date(Date.now() + 86400000 + 25200000).toISOString(),
     total_capacity: capacity,
     seat_classes: [
-      { class_name: "ECONOMY", total_seats: econSeats, fare_base_price: 450.00 },
-      { class_name: "BUSINESS", total_seats: busSeats, fare_base_price: 1200.00 }
+      { class_name: "ECONOMY", total_seats: econSeats, fare_base_price: 250.00 },
+      { class_name: "BUSINESS", total_seats: busSeats, fare_base_price: 850.00 }
     ]
   };
 
   try {
-    const res = await API.adminCreateFlight(payload);
-    if (btn) {
-      btn.disabled = false;
-    }
-    showToast(`Flight ${res.flight_number} created successfully! ID: ${res.id}`, "success");
+    const created = await API.adminCreateFlight(payload);
+    setButtonLoading(createBtn, false);
+    showToast(`Flight ${created.flight_number} created successfully on Supabase!`, "success");
     handleFlightSearch();
-    loadOpsOverview();
   } catch (err) {
-    if (btn) {
-      btn.disabled = false;
-    }
+    setButtonLoading(createBtn, false);
     showToast(`Flight creation failed: ${err.message}`, "error");
   }
 };
 
-// 2. LOAD OPS OVERVIEW
-window.loadOpsOverview = async function () {
-  try {
-    const ops = await API.getOpsOverview();
-    
-    document.getElementById("stat-waitlist-count").textContent = ops.waitlist_candidates?.length || 0;
-    document.getElementById("stat-escalations-count").textContent = ops.pending_escalations?.length || 0;
-    document.getElementById("stat-fraud-count").textContent = ops.fraud_flags?.length || 0;
-
-    // Render HITL Queue
-    const hitlContainer = document.getElementById("hitl-queue-container");
-    if (!ops.pending_escalations || ops.pending_escalations.length === 0) {
-      hitlContainer.innerHTML = `<p style="color: var(--accent-emerald); font-weight: 500;">No pending refund escalation requests. All clear!</p>`;
-    } else {
-      let html = `<div style="display: grid; gap: 1rem;">`;
-      ops.pending_escalations.forEach(e => {
-        html += `
-          <div style="background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-              <div style="font-weight: 700; font-size: 1.05rem;">Booking #${e.booking_id}</div>
-              <div style="font-size: 0.85rem; color: var(--text-muted);">Passenger: ${e.passenger_name} (${e.passenger_email})</div>
-              <div style="font-size: 0.9rem; color: var(--accent-amber); font-weight: 600; margin-top: 0.25rem;">Refund Requested: $${e.refund_amount.toFixed(2)} | Reason: ${e.reason}</div>
-            </div>
-            <div style="display: flex; gap: 0.5rem;">
-              <button class="btn btn-success btn-approve-refund" style="font-size: 0.85rem;" onclick="handleProcessApproval('${e.booking_id}', 'APPROVE')">Approve (HMAC Server Verified)</button>
-              <button class="btn btn-danger" style="font-size: 0.85rem;" onclick="handleProcessApproval('${e.booking_id}', 'REJECT')">Reject</button>
-            </div>
-          </div>
-        `;
-      });
-      html += `</div>`;
-      hitlContainer.innerHTML = html;
-    }
-
-    // Render Waitlist Table
-    const wlContainer = document.getElementById("ops-waitlist-table");
-    if (!ops.waitlist_candidates || ops.waitlist_candidates.length === 0) {
-      wlContainer.innerHTML = `<p style="color: var(--text-muted);">No waitlisted passengers.</p>`;
-    } else {
-      let html = `
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Priority</th>
-                <th>Passenger</th>
-                <th>Class</th>
-                <th>Loyalty Tier</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
-      ops.waitlist_candidates.forEach(w => {
-        html += `
-          <tr>
-            <td><strong style="color: var(--accent-amber);">${w.priority_score}</strong></td>
-            <td>${w.passenger_name} (${w.passenger_email})</td>
-            <td>${w.class_name}</td>
-            <td>${w.loyalty_tier}</td>
-            <td><span class="badge badge-${w.status.toLowerCase()}">${w.status}</span></td>
-          </tr>
-        `;
-      });
-      html += `</tbody></table></div>`;
-      wlContainer.innerHTML = html;
-    }
-
-    // Render Audit Table
-    const auditContainer = document.getElementById("ops-audit-table");
-    if (ops.recent_audit_logs) {
-      let html = `
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Entity</th>
-              </tr>
-            </thead>
-            <tbody>
-      `;
-      ops.recent_audit_logs.forEach(a => {
-        html += `
-          <tr>
-            <td>${new Date(a.created_at).toLocaleTimeString()}</td>
-            <td>${a.actor_type} (${a.actor_id})</td>
-            <td><strong style="color: var(--accent-indigo);">${a.action}</strong></td>
-            <td>${a.entity_name} #${a.entity_id.slice(0, 8)}...</td>
-          </tr>
-        `;
-      });
-      html += `</tbody></table></div>`;
-      auditContainer.innerHTML = html;
-    }
-
-  } catch (err) {
-    console.error("Ops overview error:", err);
-  }
-};
-
-// 3. SERVER-SIDE PROCESS APPROVAL BOUNDARY
-window.handleProcessApproval = async function (bookingId, action) {
-  if (!confirm(`Confirm ${action} for booking ${bookingId}?`)) return;
-
-  try {
-    const res = await API.processApproval(bookingId, action, "supervisor_admin", "Supervisor decision via Ops Dashboard");
-    showToast(`${res.message}`, action === "APPROVE" ? "success" : "info");
-    loadOpsOverview();
-    handleFlightSearch();
-  } catch (err) {
-    showToast(`Approval processing failed: ${err.message}`, "error");
-  }
-};
-
-// 4. FRAUD EVALUATION
+// REAL-TIME FRAUD EVALUATION
 window.handleEvaluateFraud = async function () {
   const bookingId = document.getElementById("fraud-booking-id").value.trim();
   const container = document.getElementById("fraud-eval-result");
-  const btn = document.getElementById("btn-eval-fraud");
+  const evalBtn = document.getElementById("btn-eval-fraud");
 
   if (!bookingId) {
-    showToast("Enter a Booking ID to evaluate fraud risk", "error");
+    showToast("Please enter a Booking UUID to evaluate", "warning");
     return;
   }
 
-  if (btn) {
-    btn.disabled = true;
-  }
-
+  setButtonLoading(evalBtn, true, "Evaluating Risk...");
   container.style.display = "block";
-  container.innerHTML = `<p style="color: var(--text-muted);">Evaluating database fraud signals...</p>`;
+  container.innerHTML = `<p style="color: #64748B;">Evaluating fraud risk indicators against database rules...</p>`;
 
   try {
     const res = await API.evaluateFraud(bookingId);
-    if (btn) {
-      btn.disabled = false;
-    }
+    setButtonLoading(evalBtn, false);
 
-    const isHigh = res.risk_score >= 60;
-    
-    let html = `
-      <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid ${isHigh ? 'var(--accent-rose)' : 'var(--border-color)'}; border-radius: var(--radius-md); padding: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-          <div>
-            <span style="font-weight: 800; font-size: 1.15rem;">Fraud Risk Evaluation</span>
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Target Email: ${res.passenger_email}</div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 1.75rem; font-weight: 800; color: ${isHigh ? 'var(--accent-rose)' : 'var(--accent-emerald)'}; font-family: 'JetBrains Mono', monospace;">${res.risk_score} / 100</div>
-            <span class="badge badge-${isHigh ? 'cancelled' : 'confirmed'}">${res.risk_level} RISK</span>
-          </div>
-        </div>
+    const score = typeof res.risk_score === "number" ? res.risk_score : 0;
+    const isHighRisk = score >= 50 || res.risk_level === "HIGH" || res.requires_human_review;
+    const recommendation = res.recommended_action || res.recommendation || res.risk_level || "ALLOW_TRANSACTION";
 
-        <div style="margin-bottom: 1rem; font-size: 0.95rem;">
-          <strong>Recommended Action:</strong> <span style="color: var(--accent-amber); font-weight: 600;">${res.recommended_action}</span>
+    const rawSignals = res.triggered_signals || res.reasons || [];
+    const signalsText = Array.isArray(rawSignals) && rawSignals.length > 0
+      ? rawSignals.join(" • ")
+      : (res.explanation || "No elevated fraud risk signals detected. Transaction appears normal.");
+
+    container.innerHTML = `
+      <div class="card" style="border: 1px solid ${isHighRisk ? "#FECACA" : "#A7F3D0"}; background: ${isHighRisk ? "#FEF2F2" : "#ECFDF5"}; padding: 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.85rem;">
+          <div style="font-weight: 700; font-size: 1.05rem; color: ${isHighRisk ? "#991B1B" : "#065F46"};">
+            Fraud Risk Score: <span class="font-mono tabular-nums" style="font-size: 1.4rem; font-weight: 800;">${score} / 100</span>
+          </div>
+          <span class="table-pill ${isHighRisk ? "table-pill-danger" : "table-pill-success"}">${recommendation}</span>
         </div>
+        <div style="font-size: 0.85rem; color: #334155; line-height: 1.5;">
+          <strong>Risk Signals Evaluated:</strong> ${signalsText}
+        </div>
+      </div>
     `;
-
-    if (res.triggered_signals && res.triggered_signals.length > 0) {
-      html += `
-        <div style="font-size: 0.85rem; color: var(--accent-rose); font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase;">TRIGGERED SIGNALS:</div>
-        <ul style="font-size: 0.85rem; color: var(--text-muted); padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.25rem;">
-      `;
-      res.triggered_signals.forEach(s => html += `<li>${s}</li>`);
-      html += `</ul>`;
-    } else {
-      html += `<div style="font-size: 0.85rem; color: var(--accent-emerald); font-weight: 500;">No suspicious anomaly signals detected.</div>`;
-    }
-
-    html += `</div>`;
-    container.innerHTML = html;
   } catch (err) {
-    if (btn) {
-      btn.disabled = false;
-    }
-    container.innerHTML = `<p style="color: var(--accent-rose);">Evaluation error: ${err.message}</p>`;
+    setButtonLoading(evalBtn, false);
+    showToast(`Fraud evaluation failed: ${err.message}`, "error");
+    container.innerHTML = `<p style="color: #DC2626;">Error: ${err.message}</p>`;
   }
 };
 
-// 5. RAG POLICY QUERY
+// RAG VECTOR POLICY WORKBENCH
 window.handleRAGQuery = async function () {
   const queryText = document.getElementById("rag-query-text").value.trim();
   const container = document.getElementById("rag-result-container");
-  const btn = document.getElementById("btn-query-rag");
+  const queryBtn = document.getElementById("btn-query-rag");
 
   if (!queryText) {
-    showToast("Enter a policy question", "error");
+    showToast("Please enter a policy question", "warning");
     return;
   }
 
-  if (btn) {
-    btn.disabled = true;
-  }
-
+  setButtonLoading(queryBtn, true, "Searching Vectors...");
   container.style.display = "block";
-  container.innerHTML = `<p style="color: var(--text-muted);">Querying Pinecone vector database (` + "`flight-policies`" + `)...</p>`;
+  container.innerHTML = `<p style="color: #64748B;">Searching 384-dimensional dense vector embeddings in Pinecone ('flight-policies')...</p>`;
 
   try {
     const res = await API.queryPolicy(queryText);
-    if (btn) {
-      btn.disabled = false;
-    }
-    
+    setButtonLoading(queryBtn, false);
+
     let html = `
-      <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
-          <div style="font-weight: 800; font-size: 1.15rem;">Pinecone RAG Search Results</div>
-          <span class="badge badge-${res.is_sufficient_evidence ? 'confirmed' : 'cancelled'}">
-            ${res.is_sufficient_evidence ? 'GROUNDED EVIDENCE FOUND' : 'INSUFFICIENT EVIDENCE FALLBACK'}
-          </span>
+      <div class="card" style="border: 1px solid var(--border-color); background: #FFFFFF; padding: 1.25rem;">
+        <div style="font-weight: 700; color: var(--primary); margin-bottom: 0.75rem; font-size: 1rem;">
+          Pinecone Vector Policy Citations (Grounded Context)
         </div>
     `;
 
-    if (!res.is_sufficient_evidence) {
-      html += `
-        <div style="background: rgba(244, 63, 94, 0.12); border-left: 4px solid var(--accent-rose); padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; color: #fecdd3; font-size: 0.9rem;">
-          <strong>⚠️ Insufficient Evidence Fallback:</strong> The airline vector policy database does not contain sufficient verified documentation to answer this question. Refusing to hallucinate policy details.
-        </div>
-      `;
-    }
-
     if (res.matches && res.matches.length > 0) {
-      html += `<div style="font-weight: 700; font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.6rem;">TOP RETRIEVED POLICY VECTORS:</div>`;
       res.matches.forEach((m, idx) => {
         html += `
-          <div class="evidence-box" style="margin-bottom: 0.85rem;">
-            <div style="display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 0.35rem; font-size: 0.85rem;">
-              <span>#${idx + 1} Source: ${m.source} (${m.category})</span>
-              <span style="color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace;">Score: ${m.score}</span>
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); padding: 0.85rem 1rem; border-radius: var(--radius-md); margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.35rem;">
+              <span class="font-mono" style="font-weight: 700; font-size: 0.82rem; color: #334155;">#${idx + 1} Citation: ${m.metadata?.policy_id || 'Policy Document'}</span>
+              <span class="table-pill table-pill-info font-mono tabular-nums">Cosine Score: ${(m.score * 100).toFixed(1)}%</span>
             </div>
-            <div style="color: var(--text-main); font-style: italic; font-size: 0.9rem; line-height: 1.4;">"${m.text}"</div>
+            <div style="font-size: 0.85rem; color: var(--text-main); line-height: 1.4;">${m.metadata?.text || m.text}</div>
           </div>
         `;
       });
+    } else {
+      html += `<p style="color: #64748B;">No direct vector policy match found. Policy fallback active.</p>`;
     }
 
     html += `</div>`;
     container.innerHTML = html;
   } catch (err) {
-    if (btn) {
-      btn.disabled = false;
-    }
-    container.innerHTML = `<p style="color: var(--accent-rose);">RAG Query error: ${err.message}</p>`;
+    setButtonLoading(queryBtn, false);
+    showToast(`RAG vector search error: ${err.message}`, "error");
+    container.innerHTML = `<p style="color: #DC2626;">Error: ${err.message}</p>`;
   }
 };
 
 window.setRAGSample = function (num) {
   const input = document.getElementById("rag-query-text");
   if (num === 1) input.value = "What happens if I cancel my economy ticket 30 hours before departure?";
-  if (num === 2) input.value = "What is the baggage allowance for Business class?";
-  if (num === 3) input.value = "What is the airline policy for radioactive cargo particles?";
+  else if (num === 2) input.value = "What is the baggage allowance for Business class passengers?";
+  else if (num === 3) input.value = "Can I transport hazardous dangerous industrial chemicals on international flights?";
   handleRAGQuery();
+};
+
+// READ-ONLY OPS OVERVIEW & FORMATTED DATA TABLES
+let allAdminBookings = [];
+
+window.loadOpsOverview = async function () {
+  try {
+    const data = await API.getOpsOverview();
+
+    const waitlistCount = data.waitlist_candidates ? data.waitlist_candidates.length : (data.waitlist_pending_count || 0);
+    const escalationsCount = data.pending_escalations ? data.pending_escalations.length : (data.pending_escalations_count || 0);
+    const fraudCount = data.fraud_flags ? data.fraud_flags.length : (data.fraud_flags_count || 0);
+
+    document.getElementById("stat-waitlist-count").textContent = waitlistCount;
+    document.getElementById("stat-escalations-count").textContent = escalationsCount;
+    document.getElementById("stat-fraud-count").textContent = fraudCount;
+
+    // Render Master Operations & Bookings Ledger Table
+    allAdminBookings = data.recent_bookings || [];
+    filterAdminLedgerTable();
+
+    const wlContainer = document.getElementById("ops-waitlist-table");
+    const waitlistItems = data.waitlist_candidates || data.prioritized_waitlist || [];
+    if (waitlistItems.length > 0) {
+      let wlHtml = `
+        <div class="table-responsive">
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th>Passenger</th>
+                <th>Flight ID</th>
+                <th>Class</th>
+                <th>Loyalty Tier</th>
+                <th>Priority Score</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      waitlistItems.forEach((w) => {
+        const shortFlt = w.flight_id ? w.flight_id.substring(0, 8) : "N/A";
+        wlHtml += `
+          <tr>
+            <td><strong>${w.passenger_name}</strong><br><span style="font-size: 0.72rem; color: #64748B;">${w.passenger_email}</span></td>
+            <td class="font-mono" style="font-size: 0.78rem;">${shortFlt}...</td>
+            <td><strong>${w.class_name}</strong></td>
+            <td><span class="table-pill table-pill-info">${w.loyalty_tier || "STANDARD"}</span></td>
+            <td class="font-mono tabular-nums" style="font-weight: 800; color: var(--primary);">${w.priority_score || 0}</td>
+            <td><span class="table-pill table-pill-warning">${w.status}</span></td>
+          </tr>
+        `;
+      });
+
+      wlHtml += `</tbody></table></div>`;
+      wlContainer.innerHTML = wlHtml;
+    } else {
+      wlContainer.innerHTML = `<p style="color: #64748B; font-size: 0.85rem;">No active candidates on waitlist queue.</p>`;
+    }
+
+    const auditContainer = document.getElementById("ops-audit-table");
+    if (data.recent_audit_logs && data.recent_audit_logs.length > 0) {
+      let auditHtml = `
+        <div class="table-responsive">
+          <table class="ops-table">
+            <thead>
+              <tr>
+                <th>Timestamp (UTC)</th>
+                <th>Actor</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Payload State</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+
+      data.recent_audit_logs.forEach((log) => {
+        const timeStr = new Date(log.created_at).toISOString().replace("T", " ").substring(0, 19);
+        const shortEntityId = log.entity_id ? log.entity_id.substring(0, 8) : "N/A";
+        auditHtml += `
+          <tr>
+            <td class="font-mono tabular-nums" style="font-size: 0.78rem; color: #64748B;">${timeStr}</td>
+            <td><span class="table-pill table-pill-info">${log.actor_type}</span></td>
+            <td><strong style="color: #0F172A;">${log.action}</strong></td>
+            <td class="font-mono" style="font-size: 0.78rem;">${log.entity_name} (${shortEntityId}...)</td>
+            <td class="font-mono" style="font-size: 0.75rem; color: #475569;">${JSON.stringify(log.payload_changes || {})}</td>
+          </tr>
+        `;
+      });
+
+      auditHtml += `</tbody></table></div>`;
+      auditContainer.innerHTML = auditHtml;
+    } else {
+      auditContainer.innerHTML = `<p style="color: #64748B; font-size: 0.85rem;">No audit records available.</p>`;
+    }
+
+    renderHITLQueue(data.pending_escalations || []);
+
+  } catch (err) {
+    console.error("Ops overview error:", err);
+  }
+};
+
+// MASTER BOOKINGS & HOLDS TABLE FILTERING LOGIC
+window.filterAdminLedgerTable = function () {
+  const container = document.getElementById("admin-bookings-table-body");
+  if (!container) return;
+
+  const searchInput = document.getElementById("admin-ledger-search");
+  const statusFilterElem = document.getElementById("admin-ledger-status-filter");
+
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : "";
+  const statusFilter = statusFilterElem ? statusFilterElem.value.toUpperCase() : "ALL";
+
+  const filtered = allAdminBookings.filter((b) => {
+    const matchesStatus = statusFilter === "ALL" || (b.status && b.status.toUpperCase() === statusFilter);
+    const matchesQuery = !query || 
+      (b.booking_id && b.booking_id.toLowerCase().includes(query)) ||
+      (b.passenger_name && b.passenger_name.toLowerCase().includes(query)) ||
+      (b.passenger_email && b.passenger_email.toLowerCase().includes(query)) ||
+      (b.flight_number && b.flight_number.toLowerCase().includes(query));
+    return matchesStatus && matchesQuery;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align: center; color: #64748B; padding: 2rem;">
+          No master booking records matching filter criteria.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  let html = "";
+  filtered.forEach((b) => {
+    const shortId = b.booking_id ? b.booking_id.substring(0, 8) : "N/A";
+    const statusClass = b.status === "CONFIRMED" ? "table-pill-success" : b.status === "CANCELLED" ? "table-pill-danger" : "table-pill-warning";
+    const dateStr = b.created_at ? new Date(b.created_at).toLocaleString() : "N/A";
+    const routeStr = `${b.flight_number || "FLT"} (${b.origin || "JFK"} ➔ ${b.destination || "LHR"})`;
+    const fareStr = b.fare_amount ? `$${Number(b.fare_amount).toFixed(2)}` : "$0.00";
+
+    html += `
+      <tr>
+        <td>
+          <strong class="font-mono" style="color: var(--primary); font-size: 0.84rem;" title="${b.booking_id}">
+            ${shortId}...
+          </strong>
+        </td>
+        <td>
+          <div class="font-mono" style="font-weight: 700; color: var(--text-main);">${routeStr}</div>
+        </td>
+        <td>
+          <div style="font-weight: 700;">${b.passenger_name}</div>
+          <div style="font-size: 0.75rem; color: #64748B;">${b.passenger_email}</div>
+        </td>
+        <td>
+          <span class="table-pill table-pill-info">${b.class_name || "ECONOMY"}</span>
+        </td>
+        <td>
+          <span class="font-mono tabular-nums" style="font-weight: 700;">${fareStr}</span>
+        </td>
+        <td>
+          <span class="table-pill ${statusClass}">${b.status}</span>
+        </td>
+        <td>
+          <span style="font-size: 0.78rem; color: #64748B;">${dateStr}</span>
+        </td>
+        <td style="text-align: right;">
+          <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+            <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;" onclick="inspectBookingFromAdmin('${b.booking_id}')" title="Inspect Booking Ledger">
+              <span>🔍 Inspect</span>
+            </button>
+            <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.65rem;" onclick="evalFraudFromAdmin('${b.booking_id}')" title="Evaluate Anomaly & Fraud Risk">
+              <span>🛡️ Fraud</span>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = html;
+};
+
+window.resetAdminLedgerFilters = function () {
+  const searchInput = document.getElementById("admin-ledger-search");
+  const statusFilterElem = document.getElementById("admin-ledger-status-filter");
+  if (searchInput) searchInput.value = "";
+  if (statusFilterElem) statusFilterElem.value = "ALL";
+  filterAdminLedgerTable();
+};
+
+window.inspectBookingFromAdmin = function (bookingId) {
+  switchView("bookings");
+  fillSamplePNR(bookingId);
+};
+
+window.evalFraudFromAdmin = function (bookingId) {
+  switchView("dashboard");
+  switchSubTab("fraud");
+  const fraudInput = document.getElementById("fraud-booking-id");
+  if (fraudInput) fraudInput.value = bookingId;
+  handleEvaluateFraud();
+};
+
+// SUPERVISOR REFUND & HITL QUEUE RENDERER
+function renderHITLQueue(escalations) {
+  const container = document.getElementById("hitl-queue-container");
+  if (!container) return;
+
+  if (!escalations || escalations.length === 0) {
+    container.innerHTML = `
+      <div style="padding: 1.5rem; text-align: center; color: #64748B; background: #F8FAFC; border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
+        <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🛡️</div>
+        <div style="font-weight: 700; color: #334155;">Supervisor Queue Clear</div>
+        <div style="font-size: 0.82rem; margin-top: 0.2rem;">No pending refund requests currently require human supervisor approval.</div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = "";
+  escalations.forEach((esc) => {
+    html += `
+      <div class="card" style="border: 1px solid var(--accent-amber-border); background: var(--accent-amber-bg); padding: 1.25rem; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+          <div>
+            <div style="font-weight: 700; font-size: 1rem; color: #92400E;">High-Value Refund Approval Required (> $500)</div>
+            <div style="font-size: 0.8rem; color: #78350F;" class="font-mono">Booking ID: ${esc.booking_id}</div>
+          </div>
+          <span class="table-pill table-pill-warning">${esc.status}</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #451A03; margin-bottom: 1rem;">
+          <strong>Reason:</strong> ${esc.reason} | <strong>Refund Amount:</strong> <span class="font-mono tabular-nums" style="font-weight: 800; color: #B45309;">$${esc.refund_amount}</span>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <button class="btn btn-success" onclick="handleProcessApproval('${esc.booking_id}', 'APPROVE')">Approve Refund (HMAC Verified)</button>
+          <button class="btn btn-danger" onclick="handleProcessApproval('${esc.booking_id}', 'REJECT')">Reject Refund</button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+window.handleProcessApproval = async function (bookingId, action) {
+  try {
+    const res = await API.processApproval(bookingId, action);
+    showToast(`Supervisor Action ${action} executed successfully on FastAPI!`, "success");
+    loadOpsOverview();
+  } catch (err) {
+    showToast(`Approval processing error: ${err.message}`, "error");
+  }
 };

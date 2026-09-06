@@ -11,8 +11,6 @@
       window.ENV_API_URL = "https://flight-management-system-o8jt.onrender.com";
     }
   </script>
-
-
 </head>
 <body>
 
@@ -24,35 +22,36 @@
         <div class="brand-icon">SF</div>
         <div>
           <div class="brand-title">SkyFlow Ops</div>
-          <div class="brand-subtitle">Enterprise Flight Control</div>
+          <div class="brand-subtitle" id="sidebar-brand-subtitle">Customer Booking Portal</div>
         </div>
       </div>
 
       <nav class="sidebar-nav">
-        <!-- PASSENGER PORTAL SECTION -->
-        <div class="nav-group">
-          <div class="nav-section-title">Passenger Operations</div>
+        <!-- 1. PASSENGER WORKSPACE SECTION -->
+        <div class="nav-group" id="nav-group-passenger">
+          <div class="nav-section-title">Passenger Portal</div>
           <button class="nav-item active" id="nav-search" onclick="switchView('search')">
-            <span>Flight Search & Inventory</span>
+            <span>Flight Search & Holds</span>
           </button>
           <button class="nav-item" id="nav-bookings" onclick="switchView('bookings')">
-            <span>Booking Lookup & Cancellation</span>
+            <span>My Bookings / Booking Lookup & Cancel</span>
           </button>
         </div>
 
-        <div class="nav-divider"></div>
-
-        <!-- ADMIN & OPERATIONS SECTION -->
-        <div class="nav-group">
-          <div class="nav-section-title">Admin & Operations</div>
+        <!-- 2. ADMIN OPERATIONS WORKSPACE SECTION -->
+        <div class="nav-group" id="nav-group-admin" style="display: none;">
+          <div class="nav-section-title">Admin Operations</div>
           <button class="nav-item" id="nav-dashboard" onclick="switchView('dashboard')">
-            <span>Operations Dashboard</span>
+            <span>Live Ops Control Center</span>
+          </button>
+          <button class="nav-item" id="nav-sub-bookings" onclick="switchView('sub-bookings')">
+            <span>Bookings & Holds Ledger</span>
           </button>
           <button class="nav-item" id="nav-flights" onclick="switchView('flights')">
             <span>Flight Creator</span>
           </button>
           <button class="nav-item" id="nav-hitl" onclick="switchView('hitl')">
-            <span>Refund Queue & HITL</span>
+            <span>HITL Refund Queue</span>
           </button>
           <button class="nav-item" id="nav-fraud" onclick="switchView('fraud')">
             <span>Fraud Risk Assessor</span>
@@ -61,17 +60,26 @@
             <span>RAG Policy Workbench</span>
           </button>
           <button class="nav-item" id="nav-ops" onclick="switchView('ops')">
-            <span>Ops & Audit Ledger</span>
+            <span>Immutable Audit Trail</span>
+          </button>
+        </div>
+
+        <!-- 3. ENGINEERING & DEMO SECTION (ADMIN ONLY) -->
+        <div class="nav-group" id="nav-group-engineering" style="display: none;">
+          <div class="nav-divider" style="margin-bottom: 0.75rem;"></div>
+          <div class="nav-section-title">Engineering / Demo</div>
+          <button class="nav-item" id="nav-arch" onclick="toggleArchModal(true)">
+            <span>Architecture & Design</span>
           </button>
         </div>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-badge">
-          <div class="avatar">SA</div>
+        <div class="user-badge" id="user-badge-container">
+          <div class="avatar" id="user-badge-avatar">GP</div>
           <div>
-            <div class="user-name">Supervisor Admin</div>
-            <div class="user-role">FastAPI Transactional Writer</div>
+            <div class="user-name" id="user-badge-name">Guest Passenger</div>
+            <div class="user-role" id="user-badge-role">Customer Self-Service</div>
           </div>
         </div>
       </div>
@@ -80,19 +88,21 @@
     <!-- MAIN WRAPPER -->
     <div class="main-wrapper">
 
-      <!-- TOP HEADER -->
+      <!-- TOPBAR HEADER -->
       <header class="topbar">
         <div class="header-info">
-          <h1 id="page-view-title">Flight Search & Inventory Query</h1>
-          <p id="page-view-desc">Query live flight schedules from Supabase PostgreSQL and manage atomic seat holds.</p>
+          <h1 id="page-view-title">Flight Inventory & Live Search</h1>
+          <p id="page-view-desc">Query active flight schedules from Supabase PostgreSQL and manage atomic seat holds.</p>
         </div>
 
         <div class="topbar-actions">
-          <!-- COMPATIBILITY TABS FOR E2E TEST -->
-          <div class="nav-tabs-compat" style="display: flex;">
-            <button class="nav-tab active" id="tab-passenger" onclick="switchTab('passenger')">Passenger Portal</button>
-            <button class="nav-tab" id="tab-admin" onclick="switchTab('admin')">Admin & Ops</button>
-          </div>
+          <button class="btn btn-secondary" id="btn-switch-workspace" onclick="togglePortalModal(true)" style="font-size: 0.82rem;">
+            <span>Switch Workspace</span>
+          </button>
+
+          <button class="btn btn-secondary" onclick="toggleArchModal(true)" style="font-size: 0.82rem;">
+            <span>Architecture & Design</span>
+          </button>
 
           <!-- SYSTEM CONNECTIVITY BADGE -->
           <div class="status-badge" id="system-status">
@@ -106,72 +116,33 @@
       <main class="container">
 
         <!-- ======================================================== -->
-        <!-- PASSENGER PORTAL TAB CONTAINER (TASK 6.1) -->
+        <!-- PASSENGER PORTAL TAB CONTAINER -->
         <!-- ======================================================== -->
         <div id="view-passenger">
 
-          <!-- 1. FLIGHT SEARCH VIEW -->
+          <!-- 1. FLIGHT SEARCH & HOLD VIEW -->
           <div id="subview-search">
             
             <div class="card">
               <div class="card-header">
-                <div class="card-title">Search Live Flight Inventory</div>
+                <div>
+                  <div class="card-title">Search Live Flight Inventory</div>
+                  <div class="card-subtitle">Select origin and destination to query live seat availability</div>
+                </div>
               </div>
               <div class="grid-form">
                 <div class="form-group">
-                  <label for="search-origin">Origin Airport</label>
-                  <input type="text" id="search-origin" class="form-control" placeholder="e.g. JFK, SFO, LAX" value="JFK">
+                  <label for="search-origin">Origin Airport Code</label>
+                  <input type="text" id="search-origin" class="form-control font-mono" placeholder="e.g. JFK, SFO, LAX" value="JFK">
                 </div>
                 <div class="form-group">
-                  <label for="search-destination">Destination Airport</label>
-                  <input type="text" id="search-destination" class="form-control" placeholder="e.g. LHR, ORD, MIA" value="LHR">
+                  <label for="search-destination">Destination Airport Code</label>
+                  <input type="text" id="search-destination" class="form-control font-mono" placeholder="e.g. LHR, ORD, MIA" value="LHR">
                 </div>
                 <div class="form-group" style="align-self: flex-end;">
-                  <button class="btn btn-primary" id="btn-search-flights" onclick="handleFlightSearch()">Search Live Flights</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- ACTIVE HOLD COUNTDOWN & BOOKING FORM (MODAL POPUP) -->
-            <div id="active-hold-container" style="display: none;">
-              <div class="modal-dialog-box">
-                <button class="modal-close-icon" onclick="closeHoldModal()" title="Minimize / Close Modal">✕</button>
-
-                <div class="hold-timer-box" style="margin-bottom: 1.25rem;">
-                  <div>
-                    <div style="font-weight: 700; color: #B45309; font-size: 1.05rem; display: flex; align-items: center; gap: 0.4rem;">
-                      <span>⏳</span> Temporary Seat Hold Active
-                    </div>
-                    <div style="font-size: 0.85rem; color: #64748B;" id="hold-id-display">Hold ID: -</div>
-                  </div>
-                  <div class="timer-digits" id="hold-timer-countdown">10:00</div>
-                </div>
-
-                <div class="card" style="border: none; box-shadow: none; padding: 0; background: transparent;">
-                  <div class="card-header" style="padding-left: 0; padding-right: 0; border-bottom: 1px solid var(--border-color); margin-bottom: 1.25rem; padding-bottom: 0.75rem;">
-                    <div class="card-title" style="font-size: 1.15rem; color: var(--text-main);">Complete Booking (Convert Active Hold)</div>
-                  </div>
-                  <div class="grid-form">
-                    <div class="form-group">
-                      <label for="book-passenger-id">Passenger ID</label>
-                      <input type="text" id="book-passenger-id" class="form-control" value="pass_demo_01">
-                    </div>
-                    <div class="form-group">
-                      <label for="book-passenger-name">Passenger Name</label>
-                      <input type="text" id="book-passenger-name" class="form-control" value="Demo Passenger">
-                    </div>
-                    <div class="form-group">
-                      <label for="book-passenger-email">Passenger Email</label>
-                      <input type="email" id="book-passenger-email" class="form-control" value="passenger@example.com">
-                    </div>
-                    <div class="form-group">
-                      <label for="book-idempotency-key">Idempotency Key</label>
-                      <input type="text" id="book-idempotency-key" class="form-control" readonly>
-                    </div>
-                    <div class="form-group" style="align-self: flex-end; grid-column: span 2;">
-                      <button class="btn btn-success" id="btn-complete-booking" onclick="handleCompleteBooking()" style="width: 100%; justify-content: center; padding: 0.75rem; font-size: 1rem; font-weight: 700;">Confirm & Book Seat</button>
-                    </div>
-                  </div>
+                  <button class="btn btn-primary" id="btn-search-flights" onclick="handleFlightSearch()">
+                    <span>Search Live Inventory</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -179,28 +150,45 @@
             <!-- SEARCH RESULTS DISPLAY -->
             <div class="card">
               <div class="card-header">
-                <div class="card-title">Available Flight Options</div>
+                <div class="card-title">Available Flight Schedules</div>
               </div>
               <div id="search-results-container">
-                <p style="color: #64748B;">Click "Search Live Flights" to query available flight schedules from Supabase.</p>
+                <p style="color: #64748B;">Click "Search Live Inventory" to query available flight schedules from Supabase.</p>
               </div>
             </div>
 
           </div>
 
-          <!-- 2. BOOKING LOOKUP & CANCELLATION VIEW -->
-          <div id="subview-bookings">
+          <!-- 2. BOOKING LOOKUP & CANCELLATION VIEW (ISOLATED) -->
+          <div id="subview-bookings" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">Booking Lookup & Management</div>
+                <div>
+                  <div class="card-title">Booking Lookup & Cancellation Management</div>
+                  <div class="card-subtitle">Search by Booking Reference ID or Idempotency Key to manage confirmed tickets</div>
+                </div>
               </div>
+              
               <div class="grid-form">
                 <div class="form-group" style="grid-column: span 2;">
-                  <label for="lookup-booking-id">Booking ID or Idempotency Key</label>
-                  <input type="text" id="lookup-booking-id" class="form-control" placeholder="Paste Booking UUID or Idempotency Key">
+                  <label for="lookup-booking-id">Booking Reference / Booking ID</label>
+                  <input type="text" id="lookup-booking-id" class="form-control font-mono" placeholder="Enter Booking Reference ID or Idempotency Key">
                 </div>
                 <div class="form-group" style="align-self: flex-end;">
-                  <button class="btn btn-secondary" id="btn-lookup-booking" onclick="handleBookingLookup()">Lookup Booking</button>
+                  <button class="btn btn-primary" id="btn-lookup-booking" onclick="handleBookingLookup()">
+                    <span>Lookup Booking</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- DEMO SHORTCUTS & RECENT BOOKINGS BAR -->
+              <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+                <div style="font-size: 0.78rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.6rem;">
+                  Quick Test Shortcuts & Recent Bookings
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;" id="recent-lookups-bar">
+                  <button class="shortcut-pill" onclick="fillSamplePNR('demo_sample_1')"><span>🔗 Sample PNR #1</span></button>
+                  <button class="shortcut-pill" onclick="fillSamplePNR('demo_sample_2')"><span>🔗 Sample PNR #2</span></button>
                 </div>
               </div>
 
@@ -211,76 +199,137 @@
         </div>
 
         <!-- ======================================================== -->
-        <!-- ADMIN & OPERATIONS TAB CONTAINER (TASK 6.2) -->
+        <!-- ADMIN & OPERATIONS TAB CONTAINER -->
         <!-- ======================================================== -->
         <div id="view-admin" style="display: none;">
 
-          <!-- STATS OVERVIEW HEADER -->
+          <!-- EXECUTIVE KPI STATS BANNER -->
           <div class="stats-grid" id="admin-stats-grid">
             <div class="stat-card">
-              <div class="stat-label">System State</div>
+              <div class="stat-label">PostgreSQL Database</div>
               <div class="stat-value" style="color: #10B981;" id="stat-system-state">HEALTHY</div>
+              <div class="stat-desc">Supabase Cloud PostgreSQL 17.6</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Active Waitlist</div>
               <div class="stat-value" style="color: #F59E0B;" id="stat-waitlist-count">0</div>
+              <div class="stat-desc">n8n prioritized queue candidates</div>
             </div>
             <div class="stat-card">
-              <div class="stat-label">Pending Refund Requests</div>
+              <div class="stat-label">Pending Refund Escalations</div>
               <div class="stat-value" style="color: #0052FF;" id="stat-escalations-count">0</div>
+              <div class="stat-desc">HITL supervisor HMAC review boundary</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Fraud Flags</div>
-              <div class="stat-value" style="color: #EF4444;" id="stat-fraud-count">0</div>
+              <div class="stat-value" style="color: #DC2626;" id="stat-fraud-count">0</div>
+              <div class="stat-desc">Batch anomaly rule evaluations</div>
             </div>
           </div>
 
-          <!-- ADMIN SUBTAB BUTTON BAR FOR E2E TEST COMPATIBILITY -->
+          <!-- ADMIN SUBTAB BUTTON BAR -->
           <div class="card" style="margin-bottom: 1.5rem;">
             <div class="card-header" style="border: none; padding: 0;">
               <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                <button class="btn btn-primary" id="subtab-flights" onclick="switchSubTab('flights')">Flight Creator & Inventory</button>
-                <button class="btn btn-secondary" id="subtab-hitl" onclick="switchSubTab('hitl')">Refund & HITL Queue</button>
-                <button class="btn btn-secondary" id="subtab-fraud" onclick="switchSubTab('fraud')">Fraud Anomaly Agent</button>
+                <button class="btn btn-primary" id="subtab-bookings" onclick="switchSubTab('bookings')">Master Bookings Ledger</button>
+                <button class="btn btn-secondary" id="subtab-flights" onclick="switchSubTab('flights')">Flight Creator</button>
+                <button class="btn btn-secondary" id="subtab-hitl" onclick="switchSubTab('hitl')">Refund HITL Queue</button>
+                <button class="btn btn-secondary" id="subtab-fraud" onclick="switchSubTab('fraud')">Fraud Anomaly Assessor</button>
                 <button class="btn btn-secondary" id="subtab-rag" onclick="switchSubTab('rag')">RAG Policy Workbench</button>
-                <button class="btn btn-secondary" id="subtab-ops" onclick="switchSubTab('ops')">Ops & Audit Trail</button>
+                <button class="btn btn-secondary" id="subtab-ops" onclick="switchSubTab('ops')">Ops Audit Ledger</button>
               </div>
             </div>
           </div>
 
-          <!-- ADMIN SUBVIEW 1: FLIGHT CREATOR & INVENTORY -->
-          <div id="admin-subview-flights">
+          <!-- ADMIN SUBVIEW 0: MASTER BOOKINGS & HOLDS LEDGER -->
+          <div id="admin-subview-bookings">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">Create New Flight</div>
+                <div>
+                  <div class="card-title">Master Operations & Bookings Ledger</div>
+                  <div class="card-subtitle">Authoritative transactional record of all confirmed, held, and cancelled flight reservations</div>
+                </div>
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="loadOpsOverview()">
+                  <span>🔄 Refresh Ledger</span>
+                </button>
+              </div>
+
+              <!-- FILTER & SEARCH CONTROL BAR -->
+              <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; margin-bottom: 1.25rem; background: #F8FAFC; padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <div style="flex: 1; min-width: 220px;">
+                  <input type="text" id="admin-ledger-search" class="form-control font-mono" placeholder="Search by Booking ID, Passenger, Email, or Flight..." oninput="filterAdminLedgerTable()">
+                </div>
+                <div style="width: 180px;">
+                  <select id="admin-ledger-status-filter" class="form-control" onchange="filterAdminLedgerTable()">
+                    <option value="ALL">All Statuses</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="REFUNDED">REFUNDED</option>
+                  </select>
+                </div>
+                <button class="btn btn-secondary" onclick="resetAdminLedgerFilters()" style="font-size: 0.82rem;">
+                  <span>Reset Filters</span>
+                </button>
+              </div>
+
+              <!-- HIGH-DENSITY OPERATIONAL TABLE -->
+              <div class="table-responsive">
+                <table class="ops-table">
+                  <thead>
+                    <tr>
+                      <th>Booking Reference ID</th>
+                      <th>Flight & Route</th>
+                      <th>Passenger Details</th>
+                      <th>Seat Class</th>
+                      <th>Fare Paid</th>
+                      <th>Status</th>
+                      <th>Created Date</th>
+                      <th style="text-align: right;">Quick Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-bookings-table-body">
+                    <tr><td colspan="8" style="text-align: center; color: #64748B; padding: 2rem;">Querying PostgreSQL ledger...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBVIEW 1: FLIGHT CREATOR -->
+          <div id="admin-subview-flights" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Create New Flight Schedule & Allocate Inventory</div>
               </div>
               <div class="grid-form">
                 <div class="form-group">
                   <label for="admin-flight-num">Flight Number</label>
-                  <input type="text" id="admin-flight-num" class="form-control" value="HKT-888">
+                  <input type="text" id="admin-flight-num" class="form-control font-mono" value="HKT-888">
                 </div>
                 <div class="form-group">
-                  <label for="admin-origin">Origin</label>
-                  <input type="text" id="admin-origin" class="form-control" value="JFK">
+                  <label for="admin-origin">Origin Airport</label>
+                  <input type="text" id="admin-origin" class="form-control font-mono" value="JFK">
                 </div>
                 <div class="form-group">
-                  <label for="admin-destination">Destination</label>
-                  <input type="text" id="admin-destination" class="form-control" value="LHR">
+                  <label for="admin-destination">Destination Airport</label>
+                  <input type="text" id="admin-destination" class="form-control font-mono" value="LHR">
                 </div>
                 <div class="form-group">
-                  <label for="admin-capacity">Total Capacity</label>
-                  <input type="number" id="admin-capacity" class="form-control" value="12">
+                  <label for="admin-capacity">Aircraft Total Capacity</label>
+                  <input type="number" id="admin-capacity" class="form-control tabular-nums" value="12">
                 </div>
                 <div class="form-group">
                   <label for="admin-economy-seats">Economy Seats (Sum = Capacity)</label>
-                  <input type="number" id="admin-economy-seats" class="form-control" value="10">
+                  <input type="number" id="admin-economy-seats" class="form-control tabular-nums" value="10">
                 </div>
                 <div class="form-group">
                   <label for="admin-business-seats">Business Seats</label>
-                  <input type="number" id="admin-business-seats" class="form-control" value="2">
+                  <input type="number" id="admin-business-seats" class="form-control tabular-nums" value="2">
                 </div>
                 <div class="form-group" style="align-self: flex-end;">
-                  <button class="btn btn-primary" id="btn-create-flight" onclick="handleAdminCreateFlight()">Create Flight</button>
+                  <button class="btn btn-primary" id="btn-create-flight" onclick="handleAdminCreateFlight()">
+                    <span>Create Flight Schedule</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -292,7 +341,7 @@
               <div class="card-header">
                 <div class="card-title">Supervisor Refund & HITL Approval Queue</div>
               </div>
-              <p style="color: #64748B; margin-bottom: 1rem; font-size: 0.9rem;">
+              <p style="color: #64748B; margin-bottom: 1.25rem; font-size: 0.85rem;">
                 Supervisor approval boundary for high-value refunds (> $500 threshold). All decisions execute via server-side HMAC token verification on FastAPI.
               </p>
               <div id="hitl-queue-container">
@@ -310,10 +359,12 @@
               <div class="grid-form">
                 <div class="form-group" style="grid-column: span 2;">
                   <label for="fraud-booking-id">Booking ID to Evaluate</label>
-                  <input type="text" id="fraud-booking-id" class="form-control" placeholder="Enter Booking UUID">
+                  <input type="text" id="fraud-booking-id" class="form-control font-mono" placeholder="Enter Booking UUID">
                 </div>
                 <div class="form-group" style="align-self: flex-end;">
-                  <button class="btn btn-warning" id="btn-eval-fraud" onclick="handleEvaluateFraud()">Evaluate Fraud Risk</button>
+                  <button class="btn btn-warning" id="btn-eval-fraud" onclick="handleEvaluateFraud()">
+                    <span>Evaluate Fraud Risk</span>
+                  </button>
                 </div>
               </div>
               <div id="fraud-eval-result" style="margin-top: 1.5rem; display: none;"></div>
@@ -324,7 +375,7 @@
           <div id="admin-subview-rag" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">RAG Vector Policy Query Workbench</div>
+                <div class="card-title">RAG Vector Policy Search Workbench (Pinecone)</div>
               </div>
               <div class="grid-form">
                 <div class="form-group" style="grid-column: span 2;">
@@ -332,7 +383,9 @@
                   <input type="text" id="rag-query-text" class="form-control" placeholder="e.g. What is the baggage allowance for Business class?" value="What happens if I cancel my economy ticket 30 hours before departure?">
                 </div>
                 <div class="form-group" style="align-self: flex-end;">
-                  <button class="btn btn-primary" id="btn-query-rag" onclick="handleRAGQuery()">Search Policy Vectors</button>
+                  <button class="btn btn-primary" id="btn-query-rag" onclick="handleRAGQuery()">
+                    <span>Search Policy Vectors</span>
+                  </button>
                 </div>
               </div>
               
@@ -350,17 +403,19 @@
           <div id="admin-subview-ops" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">Live Operations & Audit Ledger</div>
-                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="loadOpsOverview()">Refresh Ledger</button>
+                <div class="card-title">Live Operations & Immutable Audit Trail</div>
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="loadOpsOverview()">
+                  <span>Refresh Ledger</span>
+                </button>
               </div>
 
               <div style="margin-bottom: 1.5rem;">
-                <h4 style="margin-bottom: 0.75rem; color: #D97706; font-weight: 700;">Prioritized Waitlist Candidates</h4>
+                <h4 style="margin-bottom: 0.75rem; color: #D97706; font-weight: 700;">Prioritized Waitlist Candidates (n8n Promoted)</h4>
                 <div id="ops-waitlist-table"></div>
               </div>
 
               <div>
-                <h4 style="margin-bottom: 0.75rem; color: #0052FF; font-weight: 700;">Recent Immutable Audit Trail</h4>
+                <h4 style="margin-bottom: 0.75rem; color: #0052FF; font-weight: 700;">Recent Immutable Operation Audit Trail</h4>
                 <div id="ops-audit-table"></div>
               </div>
             </div>
@@ -374,10 +429,370 @@
 
   </div>
 
-  <!-- TOAST CONTAINER -->
+  <!-- CENTERED FOCUSED FLIGHT HOLD & SEAT SELECTION PANEL -->
+  <div id="active-hold-panel" class="modal-overlay" style="display: none;">
+    <div class="hold-panel-box">
+
+      <!-- 1. CHECKOUT VIEW (HOLD & SEAT SELECTOR) -->
+      <div id="hold-panel-checkout-view">
+        <!-- FIXED PANEL HEADER -->
+        <div class="panel-header">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 1.05rem; font-weight: 800; color: var(--text-main); display: flex; align-items: center; gap: 0.4rem;">
+              <span>✈️ Flight Reservation & Seat Map</span>
+            </div>
+            <button class="modal-close-icon" onclick="closeHoldModal()" title="Close Panel">✕</button>
+          </div>
+
+          <div style="background: #FFFFFF; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between;" id="drawer-flight-summary">
+            <div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary);" class="font-mono" id="drawer-flight-code">HKT-888</div>
+              <div style="font-size: 0.8rem; color: #64748B;" id="drawer-flight-route">JFK ➔ LHR</div>
+            </div>
+            <div style="text-align: right;">
+              <span class="table-pill table-pill-info" id="drawer-flight-class">ECONOMY</span>
+              <div style="font-size: 1.1rem; font-weight: 800; color: var(--primary); margin-top: 0.2rem;" class="font-mono tabular-nums" id="drawer-flight-price">$250.00</div>
+            </div>
+          </div>
+
+          <div style="background: var(--accent-amber-bg); border: 1px solid var(--accent-amber-border); border-radius: var(--radius-md); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-weight: 700; color: #B45309; font-size: 0.88rem; display: flex; align-items: center; gap: 0.4rem;">
+                <span>⏳</span> Seat Hold Active
+              </div>
+              <div style="font-size: 0.75rem; color: #78350F;" id="hold-id-display" class="font-mono">Hold ID: -</div>
+            </div>
+            <div class="font-mono tabular-nums" style="font-size: 1.4rem; font-weight: 800; color: #B45309;" id="hold-timer-countdown">10:00</div>
+          </div>
+        </div>
+
+        <!-- SCROLLABLE PANEL BODY -->
+        <div class="panel-body">
+          
+          <!-- 2D AIRCRAFT CABIN SEAT SELECTOR -->
+          <div class="seat-map-container">
+            <div class="seat-map-fuselage">
+              <div class="cockpit-indicator">▲ COCKPIT / FRONT OF AIRCRAFT ▲</div>
+              <div class="seat-class-section-header" id="seat-map-class-title">ECONOMY CABIN SEAT MAP</div>
+              
+              <div class="seat-grid" id="cabin-seat-grid">
+                <!-- Dynamically populated 2D Cabin Grid -->
+              </div>
+
+              <div class="seat-legend">
+                <div class="legend-item"><div class="legend-box" style="background:#ECFDF5; border:1px solid #10B981;"></div> Available</div>
+                <div class="legend-item"><div class="legend-box" style="background:#0052FF;"></div> Selected</div>
+                <div class="legend-item"><div class="legend-box" style="background:#FFFBEB; border:1px solid #F59E0B;"></div> Hold</div>
+                <div class="legend-item"><div class="legend-box" style="background:#F1F5F9; border:1px solid #CBD5E1;"></div> Booked</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASSENGER CHECKOUT FORM -->
+          <div class="card" style="border: 1px solid var(--border-color); background: #FFFFFF; padding: 1.15rem; margin-bottom: 0;">
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--text-main); margin-bottom: 1rem;">Passenger Ticket Details</div>
+            <div class="grid-form">
+              <div class="form-group">
+                <label for="book-passenger-id">Passenger ID</label>
+                <input type="text" id="book-passenger-id" class="form-control font-mono" value="pass_demo_01">
+              </div>
+              <div class="form-group">
+                <label for="book-passenger-name">Passenger Name</label>
+                <input type="text" id="book-passenger-name" class="form-control" value="Demo Passenger">
+              </div>
+              <div class="form-group" style="grid-column: span 2;">
+                <label for="book-passenger-email">Passenger Email</label>
+                <input type="email" id="book-passenger-email" class="form-control" value="passenger@example.com">
+              </div>
+              <div class="form-group" style="grid-column: span 2;">
+                <label for="book-idempotency-key">Idempotency Key</label>
+                <input type="text" id="book-idempotency-key" class="form-control font-mono" readonly>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- FIXED PANEL FOOTER -->
+        <div class="panel-footer">
+          <div>
+            <div style="font-size: 0.72rem; color: #64748B; text-transform: uppercase;">Total Booking Price</div>
+            <div style="font-size: 1.25rem; font-weight: 800; color: var(--primary);" class="font-mono tabular-nums" id="drawer-total-price">$250.00</div>
+          </div>
+          <button class="btn btn-success" id="btn-complete-booking" onclick="handleCompleteBooking()" style="padding: 0.75rem 1.25rem; font-size: 0.92rem; font-weight: 700;">
+            <span>Confirm & Complete Booking</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. CONFIRMATION RECEIPT VIEW (POST-BOOKING SUCCESS) -->
+      <div id="hold-panel-confirmation-view" style="display: none;">
+        <!-- FIXED HEADER -->
+        <div class="panel-header" style="background: #ECFDF5; border-bottom: 1px solid #A7F3D0;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="font-size: 1.1rem; font-weight: 800; color: #065F46; display: flex; align-items: center; gap: 0.5rem;">
+              <span>✅</span> Booking Confirmed!
+            </div>
+            <button class="modal-close-icon" onclick="closeHoldModal()" title="Close Panel">✕</button>
+          </div>
+          <div style="font-size: 0.82rem; color: #047857;">Your flight reservation has been authoritatively stored on Supabase PostgreSQL.</div>
+        </div>
+
+        <!-- BODY RECEIPT -->
+        <div class="panel-body">
+          <div style="background: #F8FAFC; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+            <div>
+              <div style="font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px;">Booking Reference ID</div>
+              <div style="font-size: 1.05rem; font-weight: 800; color: var(--primary);" class="font-mono" id="confirm-booking-id">-</div>
+            </div>
+            <button class="btn btn-secondary" id="btn-copy-booking-id" onclick="copyCurrentBookingId()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+              <span>📋 Copy ID</span>
+            </button>
+          </div>
+
+          <div class="card" style="border: 1px solid var(--border-color); background: #FFFFFF; padding: 1.15rem; margin-bottom: 0;">
+            <div style="font-size: 0.88rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+              Flight & Ticket Details
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; font-size: 0.85rem;">
+              <div>
+                <div style="color: #64748B; font-size: 0.75rem;">Flight Number & Route</div>
+                <div style="font-weight: 800; color: var(--primary);" class="font-mono" id="confirm-flight-route">HKT-888 (JFK ➔ LHR)</div>
+              </div>
+              <div>
+                <div style="color: #64748B; font-size: 0.75rem;">Class & Assigned Seat</div>
+                <div style="font-weight: 700; color: var(--text-main);" id="confirm-seat-details">ECONOMY (1A)</div>
+              </div>
+              <div>
+                <div style="color: #64748B; font-size: 0.75rem;">Passenger Name</div>
+                <div style="font-weight: 700; color: var(--text-main);" id="confirm-passenger-name">Demo Passenger</div>
+              </div>
+              <div>
+                <div style="color: #64748B; font-size: 0.75rem;">Passenger Email</div>
+                <div style="font-weight: 600; color: var(--text-main);" id="confirm-passenger-email">passenger@example.com</div>
+              </div>
+              <div>
+                <div style="color: #64748B; font-size: 0.75rem;">Total Fare Paid</div>
+                <div style="font-weight: 800; color: var(--primary);" class="font-mono tabular-nums" id="confirm-fare-amount">$250.00</div>
+              </div>
+              <div>
+                <div style="color: #64748B; font-size: 0.75rem;">Ticket Status</div>
+                <div><span class="table-pill table-pill-success" id="confirm-booking-status">CONFIRMED</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTER ACTIONS -->
+        <div class="panel-footer">
+          <button class="btn btn-secondary" onclick="copyCurrentBookingId()" style="font-size: 0.85rem;">
+            <span>📋 Copy Booking ID</span>
+          </button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-primary" id="btn-view-confirmed-booking" onclick="viewCurrentBookingInLookup()" style="padding: 0.6rem 1.1rem; font-size: 0.88rem; font-weight: 700;">
+              <span>🔍 View Booking</span>
+            </button>
+            <button class="btn btn-secondary" onclick="closeHoldModal()" style="padding: 0.6rem 1.1rem; font-size: 0.88rem;">
+              <span>Done</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SYSTEM ARCHITECTURE INSPECTOR MODAL -->
+  <div id="arch-modal-container" class="modal-overlay" style="display: none;">
+    <div class="arch-modal-box">
+      <!-- MODAL HEADER -->
+      <div class="arch-modal-header">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span class="arch-tag">SYSTEM ARCHITECTURE & ENGINEERING SPECIFICATION</span>
+          <button class="modal-close-icon" onclick="toggleArchModal(false)" title="Close Inspector">✕</button>
+        </div>
+        <h2 class="arch-modal-title">SkyFlow Ops — Dual-Engine Platform Architecture</h2>
+        <p class="arch-modal-desc">
+          Production-grade dual-engine architecture designed for atomic seat inventory protection, cryptographic human approval boundaries, and AI vector policy querying.
+        </p>
+      </div>
+
+      <!-- SYSTEM PIPELINE NODES -->
+      <div class="arch-diagram-container">
+        <!-- NODE 1 -->
+        <div class="arch-node-card">
+          <div class="arch-node-header">
+            <div class="arch-node-title-group">
+              <span class="arch-step-num">1</span>
+              <span class="arch-node-title">Authoritative REST Writer Layer</span>
+            </div>
+            <span class="arch-node-tech">FastAPI (Python 3.11)</span>
+          </div>
+          <p class="arch-node-desc">
+            Sole transactional entrypoint for all inventory mutations. Enforces Pydantic input validation, CORS verification, connection pooling, and structured HTTP error contracts.
+          </p>
+        </div>
+
+        <!-- NODE 2 -->
+        <div class="arch-node-card">
+          <div class="arch-node-header">
+            <div class="arch-node-title-group">
+              <span class="arch-step-num">2</span>
+              <span class="arch-node-title">Database Ledger & Concurrency Protection</span>
+            </div>
+            <span class="arch-node-tech">Supabase PostgreSQL 17.6</span>
+          </div>
+          <p class="arch-node-desc">
+            Prevents double-booking via <code>SELECT ... FOR UPDATE</code> row-level locks, unique idempotency keys, and PL/pgSQL trigger <code>validate_flight_capacity_sum</code> for total aircraft seat validation.
+          </p>
+        </div>
+
+        <!-- NODE 3 -->
+        <div class="arch-node-card">
+          <div class="arch-node-header">
+            <div class="arch-node-title-group">
+              <span class="arch-step-num">3</span>
+              <span class="arch-node-title">Vector Policy RAG Workbench</span>
+            </div>
+            <span class="arch-node-tech">Pinecone Serverless + MiniLM Embeddings</span>
+          </div>
+          <p class="arch-node-desc">
+            Indexes policy documents into 384-dimensional dense vector embeddings. Provides grounded policy citations for cancellations and baggage rules with zero hallucination.
+          </p>
+        </div>
+
+        <!-- NODE 4 -->
+        <div class="arch-node-card">
+          <div class="arch-node-header">
+            <div class="arch-node-title-group">
+              <span class="arch-step-num">4</span>
+              <span class="arch-node-title">Cryptographic HITL Approval Boundary</span>
+            </div>
+            <span class="arch-node-tech">HMAC-SHA256 Token Security</span>
+          </div>
+          <p class="arch-node-desc">
+            High-value refunds (> $500) generate cryptographically signed HMAC approval tokens with 1-hour expiration, cross-resource booking ID matching, and tamper protection.
+          </p>
+        </div>
+
+        <!-- NODE 5 -->
+        <div class="arch-node-card">
+          <div class="arch-node-header">
+            <div class="arch-node-title-group">
+              <span class="arch-step-num">5</span>
+              <span class="arch-node-title">Asynchronous Workflow & Agent Orchestrator</span>
+            </div>
+            <span class="arch-node-tech">n8n Cloud / Docker Engine</span>
+          </div>
+          <p class="arch-node-desc">
+            Processes background waitlist promotions, email notifications via Gmail OAuth2, and scheduled refund workflow triggers via secure API callbacks.
+          </p>
+        </div>
+      </div>
+
+      <!-- MODAL FOOTER -->
+      <div class="arch-modal-footer">
+        <span style="font-size: 0.78rem; color: #64748B;">FastAPI &bull; PostgreSQL 17.6 &bull; Pinecone Vector DB &bull; HMAC SHA-256 &bull; n8n</span>
+        <button class="btn btn-secondary" onclick="toggleArchModal(false)" style="font-size: 0.82rem; padding: 0.4rem 0.9rem;">
+          <span>Close Inspector</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- LANDING PAGE / WORKSPACE ENTRY SELECTOR -->
+  <!-- ======================================================== -->
+  <div id="landing-page-container" class="landing-page" style="display: flex;">
+    <div class="landing-content">
+      <!-- BRAND HEADER -->
+      <div class="landing-brand">
+        <div class="brand-icon">SF</div>
+        <span class="landing-brand-title">SkyFlow Ops</span>
+        <span class="landing-v-badge">v2.4 Enterprise</span>
+      </div>
+
+      <!-- KICKER & HEADLINE -->
+      <div class="landing-kicker">
+        <span class="kicker-pulse"></span> Demo Environment &bull; Select Workspace
+      </div>
+      <h1 class="landing-headline">Airline Operations, Connected.</h1>
+      <p class="landing-subtext">
+        A unified platform connecting passenger booking workflows with airline operational control.
+      </p>
+
+      <!-- WORKSPACE CARDS GRID -->
+      <div class="landing-grid">
+        <!-- CARD 1: PASSENGER PORTAL -->
+        <div class="landing-card landing-card-passenger">
+          <div class="landing-card-top">
+            <div class="landing-card-badge badge-passenger">Customer Self-Service</div>
+            <h2 class="landing-card-title">Passenger Portal</h2>
+            <p class="landing-card-desc">
+              Search flights, hold seats, manage bookings, and view booking status.
+            </p>
+            <ul class="landing-card-features">
+              <li><span>✓</span> Live Seat Availability</li>
+              <li><span>✓</span> Atomic Seat Hold Locks</li>
+              <li><span>✓</span> Booking &amp; Cancellation</li>
+            </ul>
+          </div>
+          <button class="btn btn-primary landing-btn" onclick="selectWorkspace('passenger')">
+            <span>Enter Passenger Portal &rarr;</span>
+          </button>
+        </div>
+
+        <!-- CARD 2: AIRLINE OPERATIONS -->
+        <div class="landing-card landing-card-ops">
+          <div class="landing-card-top">
+            <div class="landing-card-badge badge-ops">Internal Control</div>
+            <h2 class="landing-card-title">Airline Operations</h2>
+            <p class="landing-card-desc">
+              Monitor flights, manage bookings, review refunds, assess risk, and access operational intelligence.
+            </p>
+            <ul class="landing-card-features">
+              <li><span>✓</span> Live Ops &amp; Bookings Ledger</li>
+              <li><span>✓</span> HITL Refund Queue (&gt; $500)</li>
+              <li><span>✓</span> RAG Policy Workbench</li>
+            </ul>
+          </div>
+          <button class="btn btn-primary landing-btn" onclick="selectWorkspace('admin')">
+            <span>Enter Airline Operations &rarr;</span>
+          </button>
+        </div>
+
+        <!-- CARD 3: ARCHITECTURE & DESIGN -->
+        <div class="landing-card landing-card-tech">
+          <div class="landing-card-top">
+            <div class="landing-card-badge badge-tech">System Inspector</div>
+            <h2 class="landing-card-title">Architecture &amp; Design</h2>
+            <p class="landing-card-desc">
+              Explore the system architecture, transactional backend, data flow, and AI-assisted operational components.
+            </p>
+            <ul class="landing-card-features">
+              <li><span>✓</span> Supabase PostgreSQL 17.6</li>
+              <li><span>✓</span> Pinecone Vector DB</li>
+              <li><span>✓</span> HMAC Token Security</li>
+            </ul>
+          </div>
+          <button class="btn btn-secondary landing-btn" onclick="openArchitectureFromLanding()">
+            <span>View Architecture &rarr;</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- SUPPORTING FOOTER LABEL -->
+      <div class="landing-footer-label">
+        SkyFlow Ops Enterprise Platform &bull; Demo Environment &bull; Select a workspace to continue
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="toast-container"></div>
 
   <!-- APPLICATION JAVASCRIPT MODULE -->
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=2.4.4"></script>
 </body>
 </html>
