@@ -13,8 +13,19 @@ A production-grade Flight Management System combining a synchronous transactiona
 
 ---
 
+## 🎥 Demo Video
+
+Watch a complete 3-minute walkthrough demonstrating SkyFlow Ops landing page selection, passenger seat holds, booking confirmations, admin ops ledger, HITL refund queue, fraud risk evaluation, and vector RAG policy workbench:
+
+<video src="demo/demo.mp4" controls width="100%"></video>
+
+> 🎬 **[Click here to view / play SkyFlow Ops Demo Video (`demo/demo.mp4`)](demo/demo.mp4)**
+
+---
+
 ## 📑 Table of Contents
 
+- [Demo Video](#-demo-video)
 - [The Problem](#-the-problem)
 - [What We Built](#-what-we-built)
 - [Architecture & Data Flow](#-architecture--data-flow)
