@@ -1,4 +1,5 @@
-import { API } from "./api.js";
+import { API, API_BASE_URL } from "./api.js";
+
 
 // GLOBAL STATE
 let activeHold = null;
@@ -126,7 +127,7 @@ async function checkHealth() {
   } catch (err) {
     const statusText = document.getElementById("system-status-text");
     statusText.textContent = "API Disconnected";
-    showToast("Cannot connect to FastAPI backend at http://127.0.0.1:8000", "error");
+    showToast(`Cannot connect to FastAPI backend at ${API_BASE_URL}`, "error");
   }
 }
 

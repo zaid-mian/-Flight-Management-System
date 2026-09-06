@@ -3,7 +3,16 @@
  * Talks directly to authoritative FastAPI REST Engine running at http://127.0.0.1:8000.
  */
 
-const API_BASE_URL = window.ENV_API_URL || "http://127.0.0.1:8000";
+const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+const queryApiUrl = urlParams.get("api_url");
+if (queryApiUrl && typeof localStorage !== "undefined") {
+    localStorage.setItem("API_BASE_URL", queryApiUrl);
+}
+
+export const API_BASE_URL = (typeof window !== "undefined" && window.ENV_API_URL) 
+    || queryApiUrl 
+    || (typeof localStorage !== "undefined" && localStorage.getItem("API_BASE_URL")) 
+    || "http://127.0.0.1:8000";
 
 async function request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;

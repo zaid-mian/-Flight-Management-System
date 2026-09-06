@@ -29,13 +29,16 @@ def get_embedder():
 def get_pinecone_index():
     global _pinecone_index
     if _pinecone_index is None:
-        env = dotenv_values(ENV_PATH)
-        api_key = env.get("PINECONE_API_KEY") or env.get("PINECORN_APII")
+        api_key = os.getenv("PINECONE_API_KEY") or os.getenv("PINECORN_APII")
         if not api_key:
-            raise ValueError("PINECONE_API_KEY missing from .env")
+            env = dotenv_values(ENV_PATH) if os.path.exists(ENV_PATH) else {}
+            api_key = env.get("PINECONE_API_KEY") or env.get("PINECORN_APII")
+        if not api_key:
+            raise ValueError("PINECONE_API_KEY missing from environment variables or .env file")
         pc = Pinecone(api_key=api_key)
         _pinecone_index = pc.Index(INDEX_NAME)
     return _pinecone_index
+
 
 
 def get_booking_context(booking_id: str):

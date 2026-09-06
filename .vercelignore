@@ -1,0 +1,15 @@
+# Ignore backend, python environments, datasets, and docs on Vercel frontend deployments
+app/
+data/
+migrations/
+scratch/
+venv/
+.venv/
+env/
+.git/
+Dockerfile
+.dockerignore
+hackthon.json
+*.md
+*.py
+requirements*.txt

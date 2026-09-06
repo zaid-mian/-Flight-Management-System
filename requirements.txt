@@ -6,10 +6,15 @@ uvicorn[standard]>=0.28.0
 pydantic>=2.6.0
 psycopg2-binary>=2.9.9
 
+# Numerical Compatibility for PyTorch 2.x
+numpy>=1.24.0,<2.0.0
+
 # Vector Database & Embeddings (CPU-only for Cloud/Vercel serverless bundle < 500MB)
 torch==2.2.2+cpu
 pinecone>=3.1.0
 sentence-transformers>=2.5.0
+transformers>=4.38.0,<5.0.0
+
 
 # HTTP & Async Client
 requests>=2.31.0
