@@ -1,0 +1,28 @@
+# Environment & Secret Files
+.env
+.env.*
+!.env.example
+
+# Task & Internal Planning (Keep Local)
+task.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+env/
+
+# Node / Web / Playwright
+node_modules/
+dist/
+.playwright/
+.DS_Store
+
+# IDE / Gemini / Scratch Metadata
+.vscode/
+.idea/
+.gemini/
+*.metadata.json

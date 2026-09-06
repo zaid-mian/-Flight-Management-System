@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Management System — Autonomous Airline Operations Control Center</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-layout">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">✈️</div>
+        <div>
+          <div class="brand-title">SkyFlow Ops</div>
+          <div class="brand-subtitle">Flight Control System</div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <!-- PASSENGER PORTAL SECTION -->
+        <div>
+          <div class="nav-section-title">Passenger Operations</div>
+          <button class="nav-item active" id="nav-search" onclick="switchView('search')">
+            <span class="nav-icon">🔍</span>
+            <span>Flight Search & Inventory</span>
+          </button>
+          <button class="nav-item" id="nav-bookings" onclick="switchView('bookings')">
+            <span class="nav-icon">📖</span>
+            <span>Booking Lookup & Cancellation</span>
+          </button>
+        </div>
+
+        <!-- ADMIN & OPERATIONS SECTION -->
+        <div>
+          <div class="nav-section-title">Admin & Operations</div>
+          <button class="nav-item" id="nav-dashboard" onclick="switchView('dashboard')">
+            <span class="nav-icon">📊</span>
+            <span>Operations Dashboard</span>
+          </button>
+          <button class="nav-item" id="nav-flights" onclick="switchView('flights')">
+            <span class="nav-icon">➕</span>
+            <span>Flight Creator</span>
+          </button>
+          <button class="nav-item" id="nav-hitl" onclick="switchView('hitl')">
+            <span class="nav-icon">🛡️</span>
+            <span>Refund Queue & HITL</span>
+          </button>
+          <button class="nav-item" id="nav-fraud" onclick="switchView('fraud')">
+            <span class="nav-icon">🕵️</span>
+            <span>Fraud Risk Assessor</span>
+          </button>
+          <button class="nav-item" id="nav-rag" onclick="switchView('rag')">
+            <span class="nav-icon">📚</span>
+            <span>RAG Policy Workbench</span>
+          </button>
+          <button class="nav-item" id="nav-ops" onclick="switchView('ops')">
+            <span class="nav-icon">📋</span>
+            <span>Ops & Audit Ledger</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-badge">
+          <div class="avatar">SA</div>
+          <div>
+            <div style="font-weight: 600; color: var(--text-main);">Supervisor Admin</div>
+            <div style="color: var(--text-dim); font-size: 0.75rem;">FastAPI Authoritative Writer</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="main-wrapper">
+
+      <!-- TOP HEADER -->
+      <header class="topbar">
+        <div class="header-info">
+          <h1 id="page-view-title">Flight Search & Inventory Query</h1>
+          <p id="page-view-desc">Query live flights from Supabase PostgreSQL and manage atomic 10-minute seat holds.</p>
+        </div>
+
+        <div class="topbar-actions">
+          <!-- COMPATIBILITY TABS FOR E2E TEST -->
+          <div class="nav-tabs-compat" style="display: flex;">
+            <button class="nav-tab active" id="tab-passenger" onclick="switchTab('passenger')">Passenger Portal</button>
+            <button class="nav-tab" id="tab-admin" onclick="switchTab('admin')">Admin & Ops</button>
+          </div>
+
+          <!-- SYSTEM CONNECTIVITY BADGE -->
+          <div class="status-badge" id="system-status">
+            <div class="dot"></div>
+            <span id="system-status-text">FastAPI & Supabase Connected</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN CONTENT CONTAINER -->
+      <main class="container">
+
+        <!-- ======================================================== -->
+        <!-- PASSENGER PORTAL TAB CONTAINER (TASK 6.1) -->
+        <!-- ======================================================== -->
+        <div id="view-passenger">
+
+          <!-- 1. FLIGHT SEARCH VIEW -->
+          <div id="subview-search">
+            
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🔍 Search Live Flight Inventory</div>
+              </div>
+              <div class="grid-form">
+                <div class="form-group">
+                  <label for="search-origin">Origin Airport</label>
+                  <input type="text" id="search-origin" class="form-control" placeholder="e.g. JFK, SFO, LAX" value="JFK">
+                </div>
+                <div class="form-group">
+                  <label for="search-destination">Destination Airport</label>
+                  <input type="text" id="search-destination" class="form-control" placeholder="e.g. LHR, ORD, MIA" value="LHR">
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                  <button class="btn btn-primary" id="btn-search-flights" onclick="handleFlightSearch()">Search Live Flights</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ACTIVE HOLD COUNTDOWN & BOOKING FORM (DRAWER / CARD) -->
+            <div id="active-hold-container" style="display: none;">
+              <div class="hold-timer-box">
+                <div>
+                  <div style="font-weight: 700; color: var(--accent-amber); font-size: 1.1rem;">⏱️ Temporary Seat Hold Active</div>
+                  <div style="font-size: 0.85rem; color: var(--text-muted);" id="hold-id-display">Hold ID: -</div>
+                </div>
+                <div class="timer-digits" id="hold-timer-countdown">10:00</div>
+              </div>
+
+              <div class="card" style="border-color: var(--border-highlight);">
+                <div class="card-header">
+                  <div class="card-title">📝 Complete Booking (Convert Active Hold)</div>
+                </div>
+                <div class="grid-form">
+                  <div class="form-group">
+                    <label for="book-passenger-id">Passenger ID</label>
+                    <input type="text" id="book-passenger-id" class="form-control" value="pass_demo_01">
+                  </div>
+                  <div class="form-group">
+                    <label for="book-passenger-name">Passenger Name</label>
+                    <input type="text" id="book-passenger-name" class="form-control" value="Demo Passenger">
+                  </div>
+                  <div class="form-group">
+                    <label for="book-passenger-email">Passenger Email</label>
+                    <input type="email" id="book-passenger-email" class="form-control" value="passenger@example.com">
+                  </div>
+                  <div class="form-group">
+                    <label for="book-idempotency-key">Idempotency Key</label>
+                    <input type="text" id="book-idempotency-key" class="form-control" readonly>
+                  </div>
+                  <div class="form-group" style="align-self: flex-end;">
+                    <button class="btn btn-success" id="btn-complete-booking" onclick="handleCompleteBooking()">Confirm & Book Seat</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEARCH RESULTS DISPLAY -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">✈️ Available Flight Options</div>
+              </div>
+              <div id="search-results-container">
+                <p style="color: var(--text-muted);">Click "Search Live Flights" to query available flight schedules from Supabase.</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 2. BOOKING LOOKUP & CANCELLATION VIEW -->
+          <div id="subview-bookings">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">📖 Booking Lookup & Management</div>
+              </div>
+              <div class="grid-form">
+                <div class="form-group" style="grid-column: span 2;">
+                  <label for="lookup-booking-id">Booking ID or Idempotency Key</label>
+                  <input type="text" id="lookup-booking-id" class="form-control" placeholder="Paste Booking UUID or Idempotency Key">
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                  <button class="btn btn-secondary" id="btn-lookup-booking" onclick="handleBookingLookup()">Lookup Booking</button>
+                </div>
+              </div>
+
+              <div id="booking-lookup-result" style="margin-top: 1.5rem; display: none;"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- ADMIN & OPERATIONS TAB CONTAINER (TASK 6.2) -->
+        <!-- ======================================================== -->
+        <div id="view-admin" style="display: none;">
+
+          <!-- STATS OVERVIEW HEADER -->
+          <div class="stats-grid" id="admin-stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">System State</div>
+              <div class="stat-value" style="color: var(--accent-emerald);" id="stat-system-state">HEALTHY</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Active Waitlist</div>
+              <div class="stat-value" style="color: var(--accent-amber);" id="stat-waitlist-count">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Pending Refund Requests</div>
+              <div class="stat-value" style="color: var(--primary);" id="stat-escalations-count">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Fraud Flags</div>
+              <div class="stat-value" style="color: var(--accent-rose);" id="stat-fraud-count">0</div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBTAB BUTTON BAR FOR E2E TEST COMPATIBILITY -->
+          <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header" style="border: none; padding: 0;">
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="btn btn-primary" id="subtab-flights" onclick="switchSubTab('flights')">Flight Creator & Inventory</button>
+                <button class="btn btn-secondary" id="subtab-hitl" onclick="switchSubTab('hitl')">Refund & HITL Queue</button>
+                <button class="btn btn-secondary" id="subtab-fraud" onclick="switchSubTab('fraud')">Fraud Anomaly Agent</button>
+                <button class="btn btn-secondary" id="subtab-rag" onclick="switchSubTab('rag')">RAG Policy Workbench</button>
+                <button class="btn btn-secondary" id="subtab-ops" onclick="switchSubTab('ops')">Ops & Audit Trail</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBVIEW 1: FLIGHT CREATOR & INVENTORY -->
+          <div id="admin-subview-flights">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">➕ Create New Flight (Admin Endpoint)</div>
+              </div>
+              <div class="grid-form">
+                <div class="form-group">
+                  <label for="admin-flight-num">Flight Number</label>
+                  <input type="text" id="admin-flight-num" class="form-control" value="HKT-888">
+                </div>
+                <div class="form-group">
+                  <label for="admin-origin">Origin</label>
+                  <input type="text" id="admin-origin" class="form-control" value="JFK">
+                </div>
+                <div class="form-group">
+                  <label for="admin-destination">Destination</label>
+                  <input type="text" id="admin-destination" class="form-control" value="LHR">
+                </div>
+                <div class="form-group">
+                  <label for="admin-capacity">Total Capacity</label>
+                  <input type="number" id="admin-capacity" class="form-control" value="12">
+                </div>
+                <div class="form-group">
+                  <label for="admin-economy-seats">Economy Seats (Sum = Capacity)</label>
+                  <input type="number" id="admin-economy-seats" class="form-control" value="10">
+                </div>
+                <div class="form-group">
+                  <label for="admin-business-seats">Business Seats</label>
+                  <input type="number" id="admin-business-seats" class="form-control" value="2">
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                  <button class="btn btn-primary" id="btn-create-flight" onclick="handleAdminCreateFlight()">Create Flight</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBVIEW 2: REFUND & HITL QUEUE -->
+          <div id="admin-subview-hitl" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🛡️ Supervisor Refund & HITL Approval Queue</div>
+              </div>
+              <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">
+                Supervisor approval boundary for high-value refunds (> $500 threshold). All decisions execute via server-side HMAC token verification on FastAPI.
+              </p>
+              <div id="hitl-queue-container">
+                <p style="color: var(--text-muted);">Loading pending refund escalations...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBVIEW 3: FRAUD ANOMALY AGENT -->
+          <div id="admin-subview-fraud" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">🕵️ Real-Time Fraud & Anomaly Evaluation</div>
+              </div>
+              <div class="grid-form">
+                <div class="form-group" style="grid-column: span 2;">
+                  <label for="fraud-booking-id">Booking ID to Evaluate</label>
+                  <input type="text" id="fraud-booking-id" class="form-control" placeholder="Enter Booking UUID">
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                  <button class="btn btn-warning" id="btn-eval-fraud" onclick="handleEvaluateFraud()">Evaluate Fraud Risk</button>
+                </div>
+              </div>
+              <div id="fraud-eval-result" style="margin-top: 1.5rem; display: none;"></div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBVIEW 4: RAG POLICY WORKBENCH -->
+          <div id="admin-subview-rag" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">📚 RAG Vector Policy Query Workbench</div>
+              </div>
+              <div class="grid-form">
+                <div class="form-group" style="grid-column: span 2;">
+                  <label for="rag-query-text">Passenger Policy Question</label>
+                  <input type="text" id="rag-query-text" class="form-control" placeholder="e.g. What is the baggage allowance for Business class?" value="What happens if I cancel my economy ticket 30 hours before departure?">
+                </div>
+                <div class="form-group" style="align-self: flex-end;">
+                  <button class="btn btn-primary" id="btn-query-rag" onclick="handleRAGQuery()">Search Policy Vectors</button>
+                </div>
+              </div>
+              
+              <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="setRAGSample(1)">Sample: Cancellation</button>
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="setRAGSample(2)">Sample: Business Baggage</button>
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="setRAGSample(3)">Sample: Unrelated Cargo (Fallback)</button>
+              </div>
+
+              <div id="rag-result-container" style="margin-top: 1.5rem; display: none;"></div>
+            </div>
+          </div>
+
+          <!-- ADMIN SUBVIEW 5: OPS & AUDIT LEDGER -->
+          <div id="admin-subview-ops" style="display: none;">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">📋 Live Operations & Audit Ledger</div>
+                <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="loadOpsOverview()">Refresh Ledger</button>
+              </div>
+
+              <div style="margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 0.75rem; color: var(--accent-amber); font-weight: 700;">Prioritized Waitlist Candidates</h4>
+                <div id="ops-waitlist-table"></div>
+              </div>
+
+              <div>
+                <h4 style="margin-bottom: 0.75rem; color: var(--accent-indigo); font-weight: 700;">Recent Immutable Audit Trail</h4>
+                <div id="ops-audit-table"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <!-- APPLICATION JAVASCRIPT MODULE -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

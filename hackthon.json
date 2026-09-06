@@ -1,0 +1,653 @@
+{
+  "name": "hackthon",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "22449fc0-31f0-4e5e-ba80-a76c36260a4d",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "SHUxCUrQxxvj8H97",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hackathon-proof",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a264338e-bdf1-4e7a-95cf-bfdcf4a3a1bd",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        304
+      ],
+      "webhookId": "09fccd7b-841a-40dc-a80d-0a9f18f500f4"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;",
+        "options": {}
+      },
+      "id": "8649802f-9021-433b-b47f-0fe283bacfe2",
+      "name": "Read Supabase Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        512,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "87ed6d8f-d072-476c-b17b-66bce8a0280d",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        752,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waitlist-promote",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "16eb4584-5799-43c4-be10-feb1d254e18a",
+      "name": "Waitlist Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        512
+      ],
+      "webhookId": "3f2f4cc3-7c7c-4d34-a3bc-d3c109cd1eea"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, flight_id, passenger_id, passenger_name, passenger_email, class_name, priority_score, loyalty_tier FROM waitlist WHERE status = 'PENDING' ORDER BY priority_score DESC, created_at ASC LIMIT 1;",
+        "options": {}
+      },
+      "id": "65ee7d2b-6ac6-4279-87e2-3e54fb594a60",
+      "name": "Get Top Waitlist Candidate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        512,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE waitlist SET status = 'PROMOTED' WHERE id = '{{ $json.id }}' RETURNING id, flight_id, passenger_id, passenger_name, passenger_email, class_name, status;",
+        "options": {}
+      },
+      "id": "026be028-12ec-4b9c-9982-945b90ef517a",
+      "name": "Promote Waitlist Candidate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        752,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nreturn {\n  json: {\n    event: \"WAITLIST_PROMOTION_EVENT\",\n    status: \"PROMOTED\",\n    waitlist_entry_id: item.id,\n    flight_id: item.flight_id,\n    passenger_id: item.passenger_id,\n    passenger_name: item.passenger_name,\n    passenger_email: item.passenger_email,\n    class_name: item.class_name,\n    fastapi_callback_contract: {\n      target_endpoint: \"POST /api/v1/bookings/convert-waitlist\",\n      requires_authoritative_transaction: true,\n      note: \"n8n marked waitlist entry PROMOTED; FastAPI will execute row-locking and booking insert during Phase 3.\"\n    }\n  }\n};"
+      },
+      "id": "26b84b6b-7c75-4bab-b3df-7ad6eb50c42e",
+      "name": "FastAPI Promotion Callback Boundary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "1b085b83-fc86-40b2-b7d1-754a017fd6f6",
+      "name": "Respond Waitlist Promotion",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1264,
+        512
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "b2d72d23-992c-4b96-96e0-f31f9f4a0da7",
+      "name": "Checkin Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT b.id AS booking_id, b.passenger_name, b.passenger_email, b.class_name, f.flight_number, f.origin, f.destination, f.departure_time FROM bookings b JOIN flights f ON b.flight_id = f.id WHERE b.status = 'CONFIRMED' AND f.status = 'SCHEDULED' AND f.departure_time BETWEEN NOW() AND NOW() + INTERVAL '48 hours';",
+        "options": {}
+      },
+      "id": "7fb55cab-5aa7-4eb8-93df-a248652f562a",
+      "name": "Query Upcoming Checkin Passengers",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        512,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const b = item.json;\n  return {\n    json: {\n      booking_id: b.booking_id,\n      passenger_name: b.passenger_name,\n      passenger_email: b.passenger_email,\n      flight_number: b.flight_number,\n      route: `${b.origin} -> ${b.destination}`,\n      departure_time: b.departure_time,\n      subject: `Check-in Reminder for Flight ${b.flight_number}`,\n      email_body: `Dear ${b.passenger_name},\\n\\nYour flight ${b.flight_number} (${b.origin} to ${b.destination}) departs at ${b.departure_time}. Please complete your online check-in.\\n\\nSafe travels!\\nFlight Management System`\n    }\n  };\n});"
+      },
+      "id": "484ce7f0-de0d-423c-abd2-42a9c96458e2",
+      "name": "Deduplicate Checkin Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.passenger_email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "id": "dde6308c-3aa7-4f28-8dc1-d4ce9a3e56d0",
+      "name": "Send Checkin Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1008,
+        704
+      ],
+      "webhookId": "f1d77aea-126e-44d0-a958-e875f7767bfe",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "SHUxCUrQxxvj8H97",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\"INSERT INTO audit_logs (actor_type, actor_id, action, entity_name, entity_id, payload_changes) VALUES ('N8N_WORKFLOW', 'n8n_checkin_scheduler', 'CHECKIN_REMINDER_SENT', 'bookings', '\" + $json.booking_id + \"', '{\\\"status\\\": \\\"SENT\\\"}');\"",
+        "options": {}
+      },
+      "id": "185770ba-059f-4554-b193-cb82f081608c",
+      "name": "Log Checkin Audit Entry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1264,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "bb561bd5-85a1-4802-8b11-81abe7ccd698",
+      "name": "Price Drop Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        256,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT b.id AS booking_id, b.passenger_name, b.passenger_email, b.fare_amount AS original_fare, sc.fare_base_price AS current_fare, (b.fare_amount - sc.fare_base_price) AS price_drop_amount, f.flight_number, f.origin, f.destination FROM bookings b JOIN seat_classes sc ON b.flight_id = sc.flight_id AND b.class_name = sc.class_name JOIN flights f ON b.flight_id = f.id WHERE b.status = 'CONFIRMED' AND sc.fare_base_price < b.fare_amount;",
+        "options": {}
+      },
+      "id": "e08ce777-631e-431b-a1c8-c0abb2d1433f",
+      "name": "Detect Qualifying Price Drop",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        512,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nreturn items.map(item => {\n  const p = item.json;\n  const original = Number(p.original_fare).toFixed(2);\n  const current = Number(p.current_fare).toFixed(2);\n  const drop = Number(p.price_drop_amount).toFixed(2);\n  return {\n    json: {\n      booking_id: p.booking_id,\n      passenger_name: p.passenger_name,\n      passenger_email: p.passenger_email,\n      flight_number: p.flight_number,\n      subject: `Price Drop Alert: Save $${drop} on Flight ${p.flight_number}`,\n      email_body: `Dear ${p.passenger_name},\\n\\nGood news! The fare for flight ${p.flight_number} (${p.origin} to ${p.destination}) has dropped.\\n\\nOriginal Fare: $${original}\\nCurrent Fare: $${current}\\nSavings: $${drop}\\n\\nContact support to request a credit voucher.\\n\\nFlight Management System`\n    }\n  };\n});"
+      },
+      "id": "c5a5e40b-b823-4f34-832d-1a427c3fcbb4",
+      "name": "Format Price Drop Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.passenger_email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "id": "74d2bcc2-2fb5-4a2e-a274-5f3ab326a1b5",
+      "name": "Send Price Drop Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1008,
+        912
+      ],
+      "webhookId": "96c1dc03-f03d-4249-8897-a863842e196a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "SHUxCUrQxxvj8H97",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\"INSERT INTO audit_logs (actor_type, actor_id, action, entity_name, entity_id, payload_changes) VALUES ('N8N_WORKFLOW', 'n8n_price_drop_watcher', 'PRICE_DROP_ALERT_SENT', 'bookings', '\" + $json.booking_id + \"', '{\\\"status\\\": \\\"SENT\\\"}');\"",
+        "options": {}
+      },
+      "id": "3b9fc81d-93df-473a-8baa-047d8cab0fa3",
+      "name": "Log Price Drop Audit Entry",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1264,
+        912
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "refund-escalation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5257cb9a-4c0d-4d52-9b4b-6723e9f8a851",
+      "name": "Refund Escalation Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        1104
+      ],
+      "webhookId": "70587716-a8b2-4f8e-b5af-38921620b105"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id AS booking_id, passenger_name, passenger_email, fare_amount FROM bookings WHERE status = 'CANCELLED' ORDER BY created_at DESC LIMIT 1;",
+        "options": {}
+      },
+      "id": "e9ef06a6-14fd-45e8-9d6b-e0f84e22be0f",
+      "name": "Identify Cancelled Booking",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        512,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\"INSERT INTO escalation_requests (booking_id, requested_by, reason, refund_amount, status) SELECT '\" + $json.booking_id + \"', 'n8n_background_worker', 'Customer cancellation refund request submitted', \" + $json.fare_amount + \", 'PENDING_REVIEW' WHERE NOT EXISTS (SELECT 1 FROM escalation_requests WHERE booking_id = '\" + $json.booking_id + \"' AND status = 'PENDING_REVIEW') RETURNING id, booking_id, requested_by, reason, refund_amount, status;\"",
+        "options": {}
+      },
+      "id": "7dadfc21-44c4-4b65-8196-429541b78e86",
+      "name": "Create Escalation Request",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        752,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.item.json;\nreturn {\n  json: {\n    escalation_id: item.id,\n    booking_id: item.booking_id,\n    requested_by: item.requested_by,\n    reason: item.reason,\n    refund_amount: item.refund_amount,\n    status: item.status,\n    passenger_email: \"mlengineer44@gmail.com\",\n    subject: `Refund Escalation Submitted (Ref: ${item.id})`,\n    email_body: `Dear Customer,\\n\\nYour refund request (Ref: ${item.id}) for booking ${item.booking_id} has been logged and submitted for Human Approval Review.\\n\\nStatus: PENDING_REVIEW\\nAmount Requested: $${item.refund_amount}\\n\\nYou will receive a confirmation once reviewed.\\n\\nFlight Management System`,\n    human_approval_boundary: {\n      action_required: \"HUMAN_APPROVAL_REVIEW\",\n      authoritative_processor: \"FASTAPI_REFUND_ENGINE\",\n      note: \"n8n created escalation request in PENDING_REVIEW state. No refund transaction executed.\"\n    }\n  }\n};"
+      },
+      "id": "dc955b44-3283-4c59-96f1-e083798f5427",
+      "name": "Format Escalation Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        1104
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.passenger_email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "id": "0639100e-3c25-4d0b-9341-07b40c6ba170",
+      "name": "Send Escalation Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1264,
+        1104
+      ],
+      "webhookId": "c16fdc35-3948-432d-9c65-3a96c758a2a8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "SHUxCUrQxxvj8H97",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "b679f571-b71d-474e-89bd-a2a7c7bf46fd",
+      "name": "Respond Refund Escalation",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1504,
+        1104
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Supabase Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Supabase Database": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waitlist Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Top Waitlist Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Top Waitlist Candidate": {
+      "main": [
+        [
+          {
+            "node": "Promote Waitlist Candidate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Promote Waitlist Candidate": {
+      "main": [
+        [
+          {
+            "node": "FastAPI Promotion Callback Boundary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FastAPI Promotion Callback Boundary": {
+      "main": [
+        [
+          {
+            "node": "Respond Waitlist Promotion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkin Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Query Upcoming Checkin Passengers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Upcoming Checkin Passengers": {
+      "main": [
+        [
+          {
+            "node": "Deduplicate Checkin Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduplicate Checkin Reminders": {
+      "main": [
+        [
+          {
+            "node": "Send Checkin Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Checkin Gmail": {
+      "main": [
+        [
+          {
+            "node": "Log Checkin Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Price Drop Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Detect Qualifying Price Drop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Qualifying Price Drop": {
+      "main": [
+        [
+          {
+            "node": "Format Price Drop Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Price Drop Notification": {
+      "main": [
+        [
+          {
+            "node": "Send Price Drop Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Price Drop Gmail": {
+      "main": [
+        [
+          {
+            "node": "Log Price Drop Audit Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refund Escalation Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Identify Cancelled Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identify Cancelled Booking": {
+      "main": [
+        [
+          {
+            "node": "Create Escalation Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Escalation Request": {
+      "main": [
+        [
+          {
+            "node": "Format Escalation Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Escalation Email": {
+      "main": [
+        [
+          {
+            "node": "Send Escalation Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Escalation Gmail": {
+      "main": [
+        [
+          {
+            "node": "Respond Refund Escalation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "fa4c41cc-85de-4209-9746-bbaa7b9131c6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "instanceId": "8e0aeb6b686c13bdb4ef695e3cd1bf94865365172ae5fb26d4d4bd1fe56b5964"
+  },
+  "nodeGroups": [],
+  "id": "XARNZIQO8BHQ20h0",
+  "tags": []
+}
