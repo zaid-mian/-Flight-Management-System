@@ -9,7 +9,6 @@ let currentView = "search";
 window.addEventListener("DOMContentLoaded", () => {
   console.log("Flight Management System Frontend Initialized.");
   checkHealth();
-  handleFlightSearch(); // Initial search load
   loadOpsOverview(); // Preload admin ops
 });
 
@@ -259,14 +258,20 @@ window.handleHoldSeat = async function (flightId, className, basePrice, btnEleme
       fare_base_price: basePrice
     };
 
+window.closeHoldModal = function () {
+  const holdBox = document.getElementById("active-hold-container");
+  if (holdBox) {
+    holdBox.style.display = "none";
+  }
+};
+
     showToast(`Seat hold created! Hold ID: ${res.hold_id}`, "success");
 
     // Display Active Hold Box & Start Timer
     const holdBox = document.getElementById("active-hold-container");
     document.getElementById("hold-id-display").textContent = `Hold ID: ${res.hold_id} | Class: ${res.class_name}`;
     document.getElementById("book-idempotency-key").value = `book-key-${crypto.randomUUID()}`;
-    holdBox.style.display = "block";
-    holdBox.scrollIntoView({ behavior: "smooth" });
+    holdBox.style.display = "flex";
 
     startHoldTimer(activeHold.expires_at);
     handleFlightSearch(); // Refresh search results to show decremented inventory
@@ -384,55 +389,108 @@ window.handleBookingLookup = async function () {
     const b = ctx.booking;
     const f = ctx.flight;
 
+    const isConfirmed = b.status === "CONFIRMED";
+    const statusBadgeBg = isConfirmed ? "#DEF7EC" : "#FDE8E8";
+    const statusBadgeColor = isConfirmed ? "#03543F" : "#9B1C1C";
+    const statusBadgeBorder = isConfirmed ? "#BCF0DA" : "#FBD5D5";
+    const statusDotColor = isConfirmed ? "#10B981" : "#EF4444";
+
     let html = `
-      <div style="background: rgba(30, 41, 59, 0.9); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+      <div class="booking-detail-card" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1.75rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.02); margin-top: 1rem;">
+        
+        <!-- HEADER ROW -->
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid #E2E8F0; flex-wrap: wrap; gap: 0.75rem;">
           <div>
-            <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent-indigo);">Booking #${b.id}</span>
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">Created: ${new Date(b.created_at).toLocaleString()}</div>
+            <div style="font-size: 1.2rem; font-weight: 800; color: #0F172A; display: flex; align-items: center; gap: 0.5rem;">
+              <span>🎫 Booking</span>
+              <span style="font-family: 'JetBrains Mono', monospace; color: #0052FF; font-size: 1.05rem;">#${b.id}</span>
+            </div>
+            <div style="font-size: 0.85rem; color: #64748B; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.4rem;">
+              <span>📅 Created: ${new Date(b.created_at).toLocaleString()}</span>
+            </div>
           </div>
-          <span class="badge badge-${b.status.toLowerCase()}">${b.status}</span>
+          <div style="background: ${statusBadgeBg}; color: ${statusBadgeColor}; border: 1px solid ${statusBadgeBorder}; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.85rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.4rem; text-transform: uppercase; letter-spacing: 0.03em;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusDotColor}; display: inline-block;"></span>
+            ${b.status}
+          </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
-          <div>
-            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">PASSENGER</div>
-            <div style="font-weight: 700; font-size: 1rem; margin-top: 0.2rem;">${b.passenger_name} (${b.passenger_id})</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">${b.passenger_email}</div>
+        <!-- 3-COLUMN DETAILS GRID -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+          
+          <!-- PASSENGER PANEL -->
+          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.725rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
+              <span>👤</span> PASSENGER
+            </div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: #0F172A; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+              <span>${b.passenger_name}</span>
+              <span style="background: #E2E8F0; color: #334155; font-size: 0.725rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${b.passenger_id}</span>
+            </div>
+            <div style="font-size: 0.825rem; color: #64748B; margin-top: 0.3rem;">✉️ ${b.passenger_email}</div>
           </div>
 
-          <div>
-            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">FLIGHT DETAILS</div>
-            <div style="font-weight: 700; font-size: 1rem; margin-top: 0.2rem;">${f.flight_number} (${f.origin} ➔ ${f.destination})</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted);">${new Date(f.departure_time).toLocaleString()}</div>
+          <!-- FLIGHT DETAILS PANEL -->
+          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.725rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
+              <span>✈️</span> FLIGHT DETAILS
+            </div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: #0F172A;">
+              ${f.flight_number} <span style="color: #0052FF;">(${f.origin} ➔ ${f.destination})</span>
+            </div>
+            <div style="font-size: 0.825rem; color: #64748B; margin-top: 0.3rem;">🕒 ${new Date(f.departure_time).toLocaleString()}</div>
           </div>
 
-          <div>
-            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">FARE & CLASS</div>
-            <div style="font-weight: 700; font-size: 1rem; margin-top: 0.2rem;">${b.class_name} - ${b.fare_code}</div>
-            <div style="font-weight: 800; color: var(--accent-emerald); font-size: 1.1rem;">$${b.fare_amount.toFixed(2)} USD</div>
+          <!-- FARE & CLASS PANEL -->
+          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.725rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem;">
+              <span>💳</span> FARE & CLASS
+            </div>
+            <div style="font-weight: 700; font-size: 0.925rem; color: #0F172A;">${b.class_name} · <span style="color: #64748B; font-weight: 500;">${b.fare_code}</span></div>
+            <div style="font-weight: 800; color: #059669; font-size: 1.15rem; margin-top: 0.2rem;">$${b.fare_amount.toFixed(2)} USD</div>
           </div>
+
         </div>
     `;
 
     if (b.status === "CONFIRMED") {
       html += `
-        <div style="display: flex; gap: 1rem; align-items: center; border-top: 1px solid var(--border-color); padding-top: 1.25rem; flex-wrap: wrap;">
-          <button class="btn btn-danger" onclick="handleCancelBooking('${b.id}')">Cancel Booking & Restore Inventory</button>
-          <button class="btn btn-warning" onclick="handleCalculateRefund('${b.id}')">Check Refund Entitlement</button>
+        <!-- ACTION BUTTONS -->
+        <div style="display: flex; gap: 0.85rem; align-items: center; border-top: 1px solid #E2E8F0; padding-top: 1.25rem; flex-wrap: wrap;">
+          <button class="btn btn-danger" style="background: #DC2626; color: #FFFFFF; font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.15s ease;" 
+                  onmouseover="this.style.background='#B91C1C'" onmouseout="this.style.background='#DC2626'"
+                  onclick="handleCancelBooking('${b.id}')">
+            🚫 Cancel Booking & Restore Inventory
+          </button>
+          <button class="btn btn-warning" style="background: #D97706; color: #FFFFFF; font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 8px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.15s ease;"
+                  onmouseover="this.style.background='#B45309'" onmouseout="this.style.background='#D97706'"
+                  onclick="handleCalculateRefund('${b.id}')">
+            💰 Check Refund Entitlement
+          </button>
         </div>
       `;
     }
 
-    // Audit History
+    // AUDIT HISTORY
     if (ctx.audit_history && ctx.audit_history.length > 0) {
       html += `
-        <div style="margin-top: 1.25rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-          <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 0.6rem;">AUTHORITATIVE AUDIT HISTORY</div>
-          <div style="font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.4rem;">
+        <div style="margin-top: 1.25rem; border-top: 1px solid #E2E8F0; padding-top: 1.25rem;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.35rem;">
+            <span>📜</span> AUTHORITATIVE AUDIT HISTORY
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 0.5rem;">
       `;
       ctx.audit_history.forEach(a => {
-        html += `<div>• <strong style="color: var(--accent-indigo);">${a.action}</strong> by <em>${a.actor_type}</em> (${a.actor_id}) at ${new Date(a.created_at).toLocaleTimeString()}</div>`;
+        const actorIdStr = a.actor_id ? ` (${a.actor_id})` : '';
+        html += `
+          <div style="background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 6px; padding: 0.65rem 0.85rem; font-size: 0.85rem; color: #334155; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="background: #EFF6FF; color: #1D4ED8; font-weight: 700; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; font-family: monospace;">${a.action}</span>
+              <span>by <strong style="color: #0F172A;">${a.actor_type}</strong>${actorIdStr}</span>
+            </div>
+            <div style="font-size: 0.775rem; color: #64748B;">🕒 ${new Date(a.created_at).toLocaleTimeString()}</div>
+          </div>
+        `;
       });
       html += `</div></div>`;
     }
