@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flight Management System — Autonomous Airline Operations Control Center</title>
+  <title>SkyFlow Ops — Flight Management & Operations Control Platform</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,52 +13,46 @@
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <div class="brand-icon">✈️</div>
+        <div class="brand-icon">SF</div>
         <div>
           <div class="brand-title">SkyFlow Ops</div>
-          <div class="brand-subtitle">Flight Control System</div>
+          <div class="brand-subtitle">Enterprise Flight Control</div>
         </div>
       </div>
 
       <nav class="sidebar-nav">
         <!-- PASSENGER PORTAL SECTION -->
-        <div>
+        <div class="nav-group">
           <div class="nav-section-title">Passenger Operations</div>
           <button class="nav-item active" id="nav-search" onclick="switchView('search')">
-            <span class="nav-icon">🔍</span>
             <span>Flight Search & Inventory</span>
           </button>
           <button class="nav-item" id="nav-bookings" onclick="switchView('bookings')">
-            <span class="nav-icon">📖</span>
             <span>Booking Lookup & Cancellation</span>
           </button>
         </div>
 
+        <div class="nav-divider"></div>
+
         <!-- ADMIN & OPERATIONS SECTION -->
-        <div>
+        <div class="nav-group">
           <div class="nav-section-title">Admin & Operations</div>
           <button class="nav-item" id="nav-dashboard" onclick="switchView('dashboard')">
-            <span class="nav-icon">📊</span>
             <span>Operations Dashboard</span>
           </button>
           <button class="nav-item" id="nav-flights" onclick="switchView('flights')">
-            <span class="nav-icon">➕</span>
             <span>Flight Creator</span>
           </button>
           <button class="nav-item" id="nav-hitl" onclick="switchView('hitl')">
-            <span class="nav-icon">🛡️</span>
             <span>Refund Queue & HITL</span>
           </button>
           <button class="nav-item" id="nav-fraud" onclick="switchView('fraud')">
-            <span class="nav-icon">🕵️</span>
             <span>Fraud Risk Assessor</span>
           </button>
           <button class="nav-item" id="nav-rag" onclick="switchView('rag')">
-            <span class="nav-icon">📚</span>
             <span>RAG Policy Workbench</span>
           </button>
           <button class="nav-item" id="nav-ops" onclick="switchView('ops')">
-            <span class="nav-icon">📋</span>
             <span>Ops & Audit Ledger</span>
           </button>
         </div>
@@ -68,8 +62,8 @@
         <div class="user-badge">
           <div class="avatar">SA</div>
           <div>
-            <div style="font-weight: 600; color: var(--text-main);">Supervisor Admin</div>
-            <div style="color: var(--text-dim); font-size: 0.75rem;">FastAPI Authoritative Writer</div>
+            <div class="user-name">Supervisor Admin</div>
+            <div class="user-role">FastAPI Transactional Writer</div>
           </div>
         </div>
       </div>
@@ -82,7 +76,7 @@
       <header class="topbar">
         <div class="header-info">
           <h1 id="page-view-title">Flight Search & Inventory Query</h1>
-          <p id="page-view-desc">Query live flights from Supabase PostgreSQL and manage atomic 10-minute seat holds.</p>
+          <p id="page-view-desc">Query live flight schedules from Supabase PostgreSQL and manage atomic seat holds.</p>
         </div>
 
         <div class="topbar-actions">
@@ -113,7 +107,7 @@
             
             <div class="card">
               <div class="card-header">
-                <div class="card-title">🔍 Search Live Flight Inventory</div>
+                <div class="card-title">Search Live Flight Inventory</div>
               </div>
               <div class="grid-form">
                 <div class="form-group">
@@ -134,15 +128,15 @@
             <div id="active-hold-container" style="display: none;">
               <div class="hold-timer-box">
                 <div>
-                  <div style="font-weight: 700; color: var(--accent-amber); font-size: 1.1rem;">⏱️ Temporary Seat Hold Active</div>
-                  <div style="font-size: 0.85rem; color: var(--text-muted);" id="hold-id-display">Hold ID: -</div>
+                  <div style="font-weight: 700; color: #B45309; font-size: 1.05rem;">Temporary Seat Hold Active</div>
+                  <div style="font-size: 0.85rem; color: #64748B;" id="hold-id-display">Hold ID: -</div>
                 </div>
                 <div class="timer-digits" id="hold-timer-countdown">10:00</div>
               </div>
 
-              <div class="card" style="border-color: var(--border-highlight);">
+              <div class="card" style="border-color: #0052FF;">
                 <div class="card-header">
-                  <div class="card-title">📝 Complete Booking (Convert Active Hold)</div>
+                  <div class="card-title">Complete Booking (Convert Active Hold)</div>
                 </div>
                 <div class="grid-form">
                   <div class="form-group">
@@ -171,10 +165,10 @@
             <!-- SEARCH RESULTS DISPLAY -->
             <div class="card">
               <div class="card-header">
-                <div class="card-title">✈️ Available Flight Options</div>
+                <div class="card-title">Available Flight Options</div>
               </div>
               <div id="search-results-container">
-                <p style="color: var(--text-muted);">Click "Search Live Flights" to query available flight schedules from Supabase.</p>
+                <p style="color: #64748B;">Click "Search Live Flights" to query available flight schedules from Supabase.</p>
               </div>
             </div>
 
@@ -184,7 +178,7 @@
           <div id="subview-bookings">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">📖 Booking Lookup & Management</div>
+                <div class="card-title">Booking Lookup & Management</div>
               </div>
               <div class="grid-form">
                 <div class="form-group" style="grid-column: span 2;">
@@ -211,19 +205,19 @@
           <div class="stats-grid" id="admin-stats-grid">
             <div class="stat-card">
               <div class="stat-label">System State</div>
-              <div class="stat-value" style="color: var(--accent-emerald);" id="stat-system-state">HEALTHY</div>
+              <div class="stat-value" style="color: #10B981;" id="stat-system-state">HEALTHY</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Active Waitlist</div>
-              <div class="stat-value" style="color: var(--accent-amber);" id="stat-waitlist-count">0</div>
+              <div class="stat-value" style="color: #F59E0B;" id="stat-waitlist-count">0</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Pending Refund Requests</div>
-              <div class="stat-value" style="color: var(--primary);" id="stat-escalations-count">0</div>
+              <div class="stat-value" style="color: #0052FF;" id="stat-escalations-count">0</div>
             </div>
             <div class="stat-card">
               <div class="stat-label">Fraud Flags</div>
-              <div class="stat-value" style="color: var(--accent-rose);" id="stat-fraud-count">0</div>
+              <div class="stat-value" style="color: #EF4444;" id="stat-fraud-count">0</div>
             </div>
           </div>
 
@@ -244,7 +238,7 @@
           <div id="admin-subview-flights">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">➕ Create New Flight (Admin Endpoint)</div>
+                <div class="card-title">Create New Flight</div>
               </div>
               <div class="grid-form">
                 <div class="form-group">
@@ -282,13 +276,13 @@
           <div id="admin-subview-hitl" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">🛡️ Supervisor Refund & HITL Approval Queue</div>
+                <div class="card-title">Supervisor Refund & HITL Approval Queue</div>
               </div>
-              <p style="color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem;">
+              <p style="color: #64748B; margin-bottom: 1rem; font-size: 0.9rem;">
                 Supervisor approval boundary for high-value refunds (> $500 threshold). All decisions execute via server-side HMAC token verification on FastAPI.
               </p>
               <div id="hitl-queue-container">
-                <p style="color: var(--text-muted);">Loading pending refund escalations...</p>
+                <p style="color: #64748B;">Loading pending refund escalations...</p>
               </div>
             </div>
           </div>
@@ -297,7 +291,7 @@
           <div id="admin-subview-fraud" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">🕵️ Real-Time Fraud & Anomaly Evaluation</div>
+                <div class="card-title">Real-Time Fraud & Anomaly Evaluation</div>
               </div>
               <div class="grid-form">
                 <div class="form-group" style="grid-column: span 2;">
@@ -316,7 +310,7 @@
           <div id="admin-subview-rag" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">📚 RAG Vector Policy Query Workbench</div>
+                <div class="card-title">RAG Vector Policy Query Workbench</div>
               </div>
               <div class="grid-form">
                 <div class="form-group" style="grid-column: span 2;">
@@ -342,17 +336,17 @@
           <div id="admin-subview-ops" style="display: none;">
             <div class="card">
               <div class="card-header">
-                <div class="card-title">📋 Live Operations & Audit Ledger</div>
+                <div class="card-title">Live Operations & Audit Ledger</div>
                 <button class="btn btn-secondary" style="font-size: 0.8rem;" onclick="loadOpsOverview()">Refresh Ledger</button>
               </div>
 
               <div style="margin-bottom: 1.5rem;">
-                <h4 style="margin-bottom: 0.75rem; color: var(--accent-amber); font-weight: 700;">Prioritized Waitlist Candidates</h4>
+                <h4 style="margin-bottom: 0.75rem; color: #D97706; font-weight: 700;">Prioritized Waitlist Candidates</h4>
                 <div id="ops-waitlist-table"></div>
               </div>
 
               <div>
-                <h4 style="margin-bottom: 0.75rem; color: var(--accent-indigo); font-weight: 700;">Recent Immutable Audit Trail</h4>
+                <h4 style="margin-bottom: 0.75rem; color: #0052FF; font-weight: 700;">Recent Immutable Audit Trail</h4>
                 <div id="ops-audit-table"></div>
               </div>
             </div>
