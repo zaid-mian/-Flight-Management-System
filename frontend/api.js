@@ -1,7 +1,15 @@
 /**
  * Centralized API Client Layer for Flight Management System Frontend.
- * Talks directly to authoritative FastAPI REST Engine running at http://127.0.0.1:8000.
+ * Talks directly to authoritative FastAPI REST Engine running on Render or local.
  */
+
+const RENDER_BACKEND_URL = "https://flight-management-system-o8jt.onrender.com";
+const LOCAL_BACKEND_URL = "http://127.0.0.1:8000";
+
+const isLocalhost = typeof window !== "undefined" && 
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+const defaultBackendUrl = isLocalhost ? LOCAL_BACKEND_URL : RENDER_BACKEND_URL;
 
 const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
 const queryApiUrl = urlParams.get("api_url");
@@ -12,7 +20,8 @@ if (queryApiUrl && typeof localStorage !== "undefined") {
 export const API_BASE_URL = (typeof window !== "undefined" && window.ENV_API_URL) 
     || queryApiUrl 
     || (typeof localStorage !== "undefined" && localStorage.getItem("API_BASE_URL")) 
-    || "http://127.0.0.1:8000";
+    || defaultBackendUrl;
+
 
 async function request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
