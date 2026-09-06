@@ -1,5 +1,15 @@
 {
-  "buildCommand": "echo 'Static build ready'",
-  "outputDirectory": "frontend",
-  "cleanUrls": true
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "frontend/$1"
+    }
+  ]
 }
