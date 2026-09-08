@@ -15,6 +15,8 @@
 <body>
 
   <div class="app-layout">
+    <!-- MOBILE SIDEBAR BACKDROP OVERLAY -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileSidebar(false)"></div>
 
     <!-- LEFT SIDEBAR -->
     <aside class="sidebar">
@@ -90,9 +92,12 @@
 
       <!-- TOPBAR HEADER -->
       <header class="topbar">
-        <div class="header-info">
-          <h1 id="page-view-title">Flight Inventory & Live Search</h1>
-          <p id="page-view-desc">Query active flight schedules from Supabase PostgreSQL and manage atomic seat holds.</p>
+        <div class="topbar-header-left">
+          <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Toggle Navigation Menu">☰</button>
+          <div class="header-info">
+            <h1 id="page-view-title">Flight Inventory & Live Search</h1>
+            <p id="page-view-desc">Query active flight schedules from Supabase PostgreSQL and manage atomic seat holds.</p>
+          </div>
         </div>
 
         <div class="topbar-actions">
@@ -228,8 +233,8 @@
           </div>
 
           <!-- ADMIN SUBTAB BUTTON BAR -->
-          <div class="card" style="margin-bottom: 1.5rem;">
-            <div class="card-header" style="border: none; padding: 0;">
+          <div class="card admin-subtabs-card" style="margin-bottom: 1.5rem;">
+            <div class="card-header admin-subtabs-container" style="border: none; padding: 0;">
               <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                 <button class="btn btn-primary" id="subtab-bookings" onclick="switchSubTab('bookings')">Master Bookings Ledger</button>
                 <button class="btn btn-secondary" id="subtab-flights" onclick="switchSubTab('flights')">Flight Creator</button>

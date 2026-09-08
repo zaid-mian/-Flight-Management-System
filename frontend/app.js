@@ -150,10 +150,27 @@ window.selectPortal = function (portalName) {
   window.selectWorkspace(portalName);
 };
 
+// MOBILE NAVIGATION DRAWER TOGGLE
+window.toggleMobileSidebar = function (forceState) {
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.getElementById("sidebar-overlay");
+  if (!sidebar) return;
+
+  const shouldOpen = typeof forceState === "boolean" ? forceState : !sidebar.classList.contains("mobile-open");
+  if (shouldOpen) {
+    sidebar.classList.add("mobile-open");
+    if (overlay) overlay.classList.add("active");
+  } else {
+    sidebar.classList.remove("mobile-open");
+    if (overlay) overlay.classList.remove("active");
+  }
+};
+
 // UNIFIED VIEW SWITCHER
 window.switchView = function (viewName) {
   currentView = viewName;
   togglePortalModal(false);
+  toggleMobileSidebar(false);
 
   const titles = {
     search: { title: "Flight Search & Live Inventory", desc: "Query live flight schedules from Supabase PostgreSQL and manage atomic seat holds." },
